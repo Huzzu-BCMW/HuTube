@@ -35,8 +35,11 @@ jobs:
 
       - name: Build Debug APK
         working-directory: android
+        env:
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
         run: |
-          gradle assembleDebug --stacktrace
+          gradle assembleDebug -PGDRIVE_CLIENT_ID="$GDRIVE_CLIENT_ID" -PGDRIVE_CLIENT_SECRET="$GDRIVE_CLIENT_SECRET" --stacktrace
 
       - name: Upload APK as Artifact
         uses: actions/upload-artifact@v4

@@ -7,12 +7,31 @@ android {
     namespace = "com.hutube.app"
     compileSdk = 34
 
+    val credentialsFile = rootProject.file("credentials.properties")
+    val credentialsProps = java.util.Properties()
+    if (credentialsFile.exists()) {
+        credentialsProps.load(credentialsFile.inputStream())
+    }
+
+    val defaultClientId = project.findProperty("GDRIVE_CLIENT_ID") as? String
+        ?: credentialsProps.getProperty("GDRIVE_CLIENT_ID")
+        ?: System.getenv("GDRIVE_CLIENT_ID")
+        ?: ""
+
+    val defaultClientSecret = project.findProperty("GDRIVE_CLIENT_SECRET") as? String
+        ?: credentialsProps.getProperty("GDRIVE_CLIENT_SECRET")
+        ?: System.getenv("GDRIVE_CLIENT_SECRET")
+        ?: ""
+
     defaultConfig {
         applicationId = "com.hutube.app"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+
+        buildConfigField("String", "DEFAULT_CLIENT_ID", "\"$defaultClientId\"")
+        buildConfigField("String", "DEFAULT_CLIENT_SECRET", "\"$defaultClientSecret\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -38,6 +57,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"

@@ -38,8 +38,17 @@ class OAuthManager(private val context: Context) {
             .apply()
     }
 
-    fun getClientId(): String = prefs.getString(KEY_CLIENT_ID, "") ?: ""
-    fun getClientSecret(): String = prefs.getString(KEY_CLIENT_SECRET, "") ?: ""
+    fun getClientId(): String {
+        val saved = prefs.getString(KEY_CLIENT_ID, "") ?: ""
+        if (saved.isNotEmpty()) return saved
+        return com.hutube.app.BuildConfig.DEFAULT_CLIENT_ID
+    }
+
+    fun getClientSecret(): String {
+        val saved = prefs.getString(KEY_CLIENT_SECRET, "") ?: ""
+        if (saved.isNotEmpty()) return saved
+        return com.hutube.app.BuildConfig.DEFAULT_CLIENT_SECRET
+    }
 
     fun saveAccessToken(token: String, refreshToken: String? = null, expiresInSeconds: Long = 3600) {
         val editor = prefs.edit()

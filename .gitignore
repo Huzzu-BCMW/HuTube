@@ -21,6 +21,8 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+android/credentials.properties
+credentials.properties
 android/.idea/
 *.apk
 *.aab
