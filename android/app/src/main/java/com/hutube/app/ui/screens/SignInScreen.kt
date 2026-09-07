@@ -1,7 +1,10 @@
 package com.hutube.app.ui.screens
 
-import android.content.Intent
+import android.annotation.SuppressLint
 import android.net.Uri
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,26 +22,36 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.hutube.app.data.drive.OAuthManager
 import com.hutube.app.ui.theme.BrandRed
 import com.hutube.app.ui.theme.CardBackground
 import com.hutube.app.ui.theme.DarkBackground
 
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun SignInScreen(
     initialClientId: String = "",
     initialClientSecret: String = "",
-    onStartGoogleAuth: (clientId: String, clientSecret: String) -> Unit,
+    oauthManager: OAuthManager,
+    onAuthSuccess: (token: String) -> Unit,
     onManualTokenSubmit: (String) -> Unit
 ) {
-    val context = LocalContext.current
     var clientId by remember { mutableStateOf(initialClientId) }
     var clientSecret by remember { mutableStateOf(initialClientSecret) }
     var showCredentialsDialog by remember { mutableStateOf(false) }
+    var showAuthWebView by remember { mutableStateOf(false) }
     var showManualToken by remember { mutableStateOf(false) }
     var manualToken by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isExchangingToken by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
+
+    // Determine current effective Client ID
+    val effectiveClientId = if (clientId.isNotBlank()) clientId.trim() else oauthManager.getClientId()
 
     Box(
         modifier = Modifier
@@ -105,35 +118,38 @@ fun SignInScreen(
             // Primary Google Sign-In Button
             Button(
                 onClick = {
-                    if (clientId.isBlank()) {
+                    if (effectiveClientId.isBlank()) {
                         showCredentialsDialog = true
                     } else {
-                        try {
-                            onStartGoogleAuth(clientId.trim(), clientSecret.trim())
-                        } catch (e: Exception) {
-                            errorMessage = e.localizedMessage
-                        }
+                        showAuthWebView = true
                     }
                 },
+                enabled = !isExchangingToken,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
-                Icon(
-                    Icons.Default.CloudQueue,
-                    contentDescription = null,
-                    tint = Color.Black,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Sign in with Google",
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                if (isExchangingToken) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Black, strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Connecting...", color = Color.Black, fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(
+                        Icons.Default.CloudQueue,
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Sign in with Google",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -148,7 +164,7 @@ fun SignInScreen(
                 Icon(Icons.Default.Key, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    if (clientId.isNotBlank()) "OAuth Configured (Edit)" else "Configure Google OAuth Client",
+                    if (effectiveClientId.isNotBlank()) "OAuth Configured (Edit)" else "Configure Google OAuth Client",
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
@@ -199,12 +215,105 @@ fun SignInScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "HuTube connects directly via HTTP Range requests to bypass preview playback errors.",
+                text = "HuTube streams directly via HTTP Range requests to bypass Google Drive playback limits.",
                 color = Color.DarkGray,
                 fontSize = 11.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+        }
+    }
+
+    // In-App OAuth WebView Dialog
+    if (showAuthWebView && effectiveClientId.isNotBlank()) {
+        val redirectUri = OAuthManager.REDIRECT_URI
+        val authUrl = oauthManager.getAuthUrl(effectiveClientId, redirectUri)
+
+        Dialog(
+            onDismissRequest = { showAuthWebView = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(DarkBackground)
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Header Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(CardBackground)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Sign in to Google Drive",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        IconButton(onClick = { showAuthWebView = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                    }
+
+                    // Embedded WebView
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                settings.setSupportZoom(true)
+                                // Set modern Chrome desktop/mobile User Agent so Google does not block WebView
+                                settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
+                                webViewClient = object : WebViewClient() {
+                                    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                        val url = request?.url?.toString() ?: ""
+
+                                        // Intercept redirect with authorization code
+                                        if (url.startsWith("http://localhost") || url.startsWith("https://localhost") || url.startsWith("hutube://")) {
+                                            val uri = Uri.parse(url)
+                                            val code = uri.getQueryParameter("code")
+                                            val error = uri.getQueryParameter("error")
+
+                                            if (error != null) {
+                                                errorMessage = "Sign-in error: $error"
+                                                showAuthWebView = false
+                                                return true
+                                            }
+
+                                            if (code != null) {
+                                                showAuthWebView = false
+                                                isExchangingToken = true
+
+                                                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                                    val result = oauthManager.exchangeCodeForToken(code, redirectUri)
+                                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                        isExchangingToken = false
+                                                        if (result.isSuccess) {
+                                                            onAuthSuccess(result.getOrNull() ?: "")
+                                                        } else {
+                                                            errorMessage = result.exceptionOrNull()?.localizedMessage ?: "Token exchange failed"
+                                                        }
+                                                    }
+                                                }
+                                                return true
+                                            }
+                                        }
+                                        return false
+                                    }
+                                }
+
+                                loadUrl(authUrl)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
         }
     }
 
@@ -218,12 +327,12 @@ fun SignInScreen(
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
-                        text = "To let HuTube access your Google Drive without SHA-1 certification issues:\n\n" +
-                                "1. Open Google Cloud Console (APIs & Services > Credentials)\n" +
-                                "2. Create an OAuth 2.0 Client ID\n" +
-                                "   • Type: Web Application\n" +
-                                "   • Authorized Redirect URI: hutube://oauth2callback\n" +
-                                "3. Paste your Client ID and Client Secret below:",
+                        text = "In your Google Cloud Console (APIs & Services > Credentials):\n\n" +
+                                "1. Click Create Credentials > OAuth client ID\n" +
+                                "2. Choose: Web application\n" +
+                                "3. In Authorized redirect URIs, enter:\n" +
+                                "   http://localhost:5000/auth/callback\n" +
+                                "4. Paste your Client ID & Client Secret below:",
                         color = Color.LightGray,
                         fontSize = 12.sp,
                         lineHeight = 18.sp
@@ -267,7 +376,8 @@ fun SignInScreen(
                     onClick = {
                         showCredentialsDialog = false
                         if (clientId.isNotBlank()) {
-                            onStartGoogleAuth(clientId.trim(), clientSecret.trim())
+                            oauthManager.saveCredentials(clientId.trim(), clientSecret.trim())
+                            showAuthWebView = true
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BrandRed)

@@ -18,7 +18,8 @@ class OAuthManager(private val context: Context) {
     private val client = OkHttpClient.Builder().build()
 
     companion object {
-        const val REDIRECT_URI = "hutube://oauth2callback"
+        const val REDIRECT_URI = "http://localhost:5000/auth/callback"
+        const val REDIRECT_URI_FALLBACK = "hutube://oauth2callback"
         const val SCOPE = "https://www.googleapis.com/auth/drive.readonly"
         const val AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
         const val TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
@@ -73,10 +74,27 @@ class OAuthManager(private val context: Context) {
             .apply()
     }
 
+    fun getAuthUrl(clientId: String? = null, redirectUri: String = REDIRECT_URI): String {
+        val cId = if (!clientId.isNullOrEmpty()) {
+            clientId
+        } else {
+            getClientId()
+        }
+
+        return StringBuilder(AUTH_ENDPOINT)
+            .append("?client_id=").append(URLEncoder.encode(cId, "UTF-8"))
+            .append("&redirect_uri=").append(URLEncoder.encode(redirectUri, "UTF-8"))
+            .append("&response_type=code")
+            .append("&scope=").append(URLEncoder.encode(SCOPE, "UTF-8"))
+            .append("&access_type=offline")
+            .append("&prompt=consent")
+            .toString()
+    }
+
     /**
      * Constructs the Google OAuth URL and opens it in Chrome Custom Tabs
      */
-    fun startOAuthLogin(activityContext: Context, clientId: String? = null, clientSecret: String? = null) {
+    fun startOAuthLogin(activityContext: Context, clientId: String? = null, clientSecret: String? = null, redirectUri: String = REDIRECT_URI) {
         val cId = if (!clientId.isNullOrEmpty()) {
             saveCredentials(clientId, clientSecret ?: "")
             clientId
@@ -88,15 +106,7 @@ class OAuthManager(private val context: Context) {
             throw IllegalArgumentException("Client ID is required for Google Sign-In.")
         }
 
-        val authUrl = StringBuilder(AUTH_ENDPOINT)
-            .append("?client_id=").append(URLEncoder.encode(cId, "UTF-8"))
-            .append("&redirect_uri=").append(URLEncoder.encode(REDIRECT_URI, "UTF-8"))
-            .append("&response_type=code")
-            .append("&scope=").append(URLEncoder.encode(SCOPE, "UTF-8"))
-            .append("&access_type=offline")
-            .append("&prompt=consent")
-            .toString()
-
+        val authUrl = getAuthUrl(cId, redirectUri)
         val uri = Uri.parse(authUrl)
         try {
             val customTabsIntent = CustomTabsIntent.Builder()
@@ -104,7 +114,6 @@ class OAuthManager(private val context: Context) {
                 .build()
             customTabsIntent.launchUrl(activityContext, uri)
         } catch (e: Exception) {
-            // Fallback to standard browser intent
             val browserIntent = Intent(Intent.ACTION_VIEW, uri)
             activityContext.startActivity(browserIntent)
         }
@@ -113,7 +122,7 @@ class OAuthManager(private val context: Context) {
     /**
      * Exchanges auth code for access_token and refresh_token
      */
-    suspend fun exchangeCodeForToken(code: String): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun exchangeCodeForToken(code: String, redirectUri: String = REDIRECT_URI): Result<String> = withContext(Dispatchers.IO) {
         try {
             val cId = getClientId()
             val cSecret = getClientSecret()
@@ -121,7 +130,7 @@ class OAuthManager(private val context: Context) {
             val formBuilder = FormBody.Builder()
                 .add("code", code)
                 .add("client_id", cId)
-                .add("redirect_uri", REDIRECT_URI)
+                .add("redirect_uri", redirectUri)
                 .add("grant_type", "authorization_code")
 
             if (cSecret.isNotEmpty()) {

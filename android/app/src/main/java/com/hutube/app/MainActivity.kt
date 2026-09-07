@@ -64,8 +64,13 @@ class MainActivity : ComponentActivity() {
                     SignInScreen(
                         initialClientId = oauthManager.getClientId(),
                         initialClientSecret = oauthManager.getClientSecret(),
-                        onStartGoogleAuth = { cId, cSecret ->
-                            oauthManager.startOAuthLogin(this, cId, cSecret)
+                        oauthManager = oauthManager,
+                        onAuthSuccess = { token ->
+                            accessToken = token
+                            Toast.makeText(this@MainActivity, "Connected to Google Drive! 🍿", Toast.LENGTH_SHORT).show()
+                            lifecycleScope.launch {
+                                driveRepository.scanDrive()
+                            }
                         },
                         onManualTokenSubmit = { token ->
                             oauthManager.saveAccessToken(token)
