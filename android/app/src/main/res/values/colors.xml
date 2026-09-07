@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_red">#E50914</color>
+    <color name="brand_dark_red">#B81D24</color>
+    <color name="background_black">#121212</color>
+    <color name="surface_card">#1E1E1E</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>

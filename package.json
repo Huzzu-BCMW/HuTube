@@ -1,0 +1,25 @@
+{
+  "name": "hutube",
+  "version": "1.0.0",
+  "description": "HuTube - Google Drive Powered OTT Media Streaming Platform",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "server": "node server/index.js",
+    "client": "npm --prefix client run dev",
+    "build:client": "npm --prefix client run build",
+    "dev": "concurrently \"node server/index.js\" \"npm --prefix client run dev\""
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "author": "",
+  "license": "ISC"
+}

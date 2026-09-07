@@ -1,0 +1,30 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+client/dist/
+dist/
+build/
+
+# Environment and sensitive tokens
+.env
+.env.local
+server/tokens.json
+server/config.json
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.apk
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db

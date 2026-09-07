@@ -1,0 +1,104 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.hutube.app"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.hutube.app"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+    buildFeatures {
+        compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8"
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/license.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/notice.txt"
+            excludes += "META-INF/ASL2.0"
+        }
+    }
+}
+
+dependencies {
+    // Core AndroidX
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.activity:activity-compose:1.8.2")
+
+    // Jetpack Compose
+    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // Media3 ExoPlayer (The exact streaming engine used by X-plore and RS File Manager)
+    val media3Version = "1.3.1"
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-ui:$media3Version")
+    implementation("androidx.media3:media3-datasource:$media3Version")
+    implementation("androidx.media3:media3-extractor:$media3Version")
+    implementation("androidx.media3:media3-session:$media3Version")
+
+    // Google Sign-In & Google Drive API v3
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20220815-2.0.0")
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+    implementation("com.google.http-client:google-http-client-gson:1.43.3")
+
+    // Coil for Compose (Image and thumbnail rendering)
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // OkHttp (HTTP client for Drive REST API calls)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
+    // Test
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+}
