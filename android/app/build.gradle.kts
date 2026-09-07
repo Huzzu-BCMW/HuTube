@@ -23,6 +23,11 @@ android {
         ?: System.getenv("GDRIVE_CLIENT_SECRET")
         ?: ""
 
+    val defaultRefreshToken = project.findProperty("GDRIVE_REFRESH_TOKEN") as? String
+        ?: credentialsProps.getProperty("GDRIVE_REFRESH_TOKEN")
+        ?: System.getenv("GDRIVE_REFRESH_TOKEN")
+        ?: ""
+
     defaultConfig {
         applicationId = "com.hutube.app"
         minSdk = 24
@@ -32,6 +37,7 @@ android {
 
         buildConfigField("String", "DEFAULT_CLIENT_ID", "\"$defaultClientId\"")
         buildConfigField("String", "DEFAULT_CLIENT_SECRET", "\"$defaultClientSecret\"")
+        buildConfigField("String", "DEFAULT_REFRESH_TOKEN", "\"$defaultRefreshToken\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -82,7 +88,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.browser:browser:1.8.0")
 
     // Jetpack Compose
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
@@ -101,22 +106,15 @@ dependencies {
     implementation("androidx.media3:media3-extractor:$media3Version")
     implementation("androidx.media3:media3-session:$media3Version")
 
-    // Google Sign-In & Google Drive API v3
-    implementation("com.google.android.gms:play-services-auth:21.0.0")
-    implementation("com.google.apis:google-api-services-drive:v3-rev20220815-2.0.0")
-    implementation("com.google.api-client:google-api-client-android:2.2.0")
-    implementation("com.google.http-client:google-http-client-gson:1.43.3")
+    // OkHttp (HTTP client for Drive REST API calls + OAuth token refresh)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // Coil for Compose (Image and thumbnail rendering)
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // OkHttp (HTTP client for Drive REST API calls)
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Test
     testImplementation("junit:junit:4.13.2")

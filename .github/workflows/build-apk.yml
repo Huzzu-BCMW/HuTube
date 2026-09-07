@@ -38,8 +38,9 @@ jobs:
         env:
           GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
         run: |
-          gradle assembleDebug -PGDRIVE_CLIENT_ID="$GDRIVE_CLIENT_ID" -PGDRIVE_CLIENT_SECRET="$GDRIVE_CLIENT_SECRET" --stacktrace
+          gradle assembleDebug -PGDRIVE_CLIENT_ID="$GDRIVE_CLIENT_ID" -PGDRIVE_CLIENT_SECRET="$GDRIVE_CLIENT_SECRET" -PGDRIVE_REFRESH_TOKEN="$GDRIVE_REFRESH_TOKEN" --stacktrace
 
       - name: Upload APK as Artifact
         uses: actions/upload-artifact@v4

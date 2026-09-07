@@ -1,70 +1,87 @@
 package com.hutube.app.data.drive
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import androidx.browser.customtabs.CustomTabsIntent
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.net.URLEncoder
+import java.util.concurrent.TimeUnit
 
+/**
+ * Zero-login OAuth Manager for HuTube.
+ *
+ * Credentials (Client ID, Client Secret, Refresh Token) are baked into BuildConfig
+ * at build time via GitHub Secrets. On app launch, this manager silently exchanges
+ * the refresh token for an access token — no UI, no WebView, no login screen.
+ */
 class OAuthManager(private val context: Context) {
 
     private val prefs = context.getSharedPreferences("hutube_auth", Context.MODE_PRIVATE)
-    private val client = OkHttpClient.Builder().build()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
 
     companion object {
-        const val REDIRECT_URI = "http://localhost:5000/auth/callback"
-        const val REDIRECT_URI_FALLBACK = "hutube://oauth2callback"
-        const val SCOPE = "https://www.googleapis.com/auth/drive.readonly"
-        const val AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
+        private const val TAG = "OAuthManager"
         const val TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 
-        // Default or user-provided credentials
-        const val KEY_CLIENT_ID = "client_id"
-        const val KEY_CLIENT_SECRET = "client_secret"
-        const val KEY_ACCESS_TOKEN = "access_token"
-        const val KEY_REFRESH_TOKEN = "refresh_token"
-        const val KEY_EXPIRES_AT = "expires_at"
+        private const val KEY_ACCESS_TOKEN = "access_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
+        private const val KEY_EXPIRES_AT = "expires_at"
     }
 
-    fun saveCredentials(clientId: String, clientSecret: String) {
-        prefs.edit()
-            .putString(KEY_CLIENT_ID, clientId.trim())
-            .putString(KEY_CLIENT_SECRET, clientSecret.trim())
-            .apply()
-    }
+    // --- Credential Getters (BuildConfig first, SharedPreferences fallback) ---
 
     fun getClientId(): String {
-        val saved = prefs.getString(KEY_CLIENT_ID, "") ?: ""
-        if (saved.isNotEmpty()) return saved
-        return com.hutube.app.BuildConfig.DEFAULT_CLIENT_ID
+        return com.hutube.app.BuildConfig.DEFAULT_CLIENT_ID.ifEmpty {
+            prefs.getString("client_id", "") ?: ""
+        }
     }
 
     fun getClientSecret(): String {
-        val saved = prefs.getString(KEY_CLIENT_SECRET, "") ?: ""
-        if (saved.isNotEmpty()) return saved
-        return com.hutube.app.BuildConfig.DEFAULT_CLIENT_SECRET
+        return com.hutube.app.BuildConfig.DEFAULT_CLIENT_SECRET.ifEmpty {
+            prefs.getString("client_secret", "") ?: ""
+        }
     }
 
-    fun saveAccessToken(token: String, refreshToken: String? = null, expiresInSeconds: Long = 3600) {
-        val editor = prefs.edit()
-            .putString(KEY_ACCESS_TOKEN, token.trim())
-            .putLong(KEY_EXPIRES_AT, System.currentTimeMillis() + (expiresInSeconds * 1000))
-        if (!refreshToken.isNullOrEmpty()) {
-            editor.putString(KEY_REFRESH_TOKEN, refreshToken.trim())
-        }
-        editor.apply()
+    /**
+     * Returns the refresh token — baked-in from BuildConfig takes priority,
+     * then falls back to any previously stored one in SharedPreferences.
+     */
+    fun getRefreshToken(): String {
+        val bakedIn = com.hutube.app.BuildConfig.DEFAULT_REFRESH_TOKEN
+        if (bakedIn.isNotEmpty()) return bakedIn
+        return prefs.getString(KEY_REFRESH_TOKEN, "") ?: ""
     }
+
+    /**
+     * Returns true if we have all the credentials needed to silently authenticate.
+     * This means: Client ID + Client Secret + Refresh Token are all non-empty.
+     */
+    fun hasCredentials(): Boolean {
+        return getClientId().isNotEmpty() &&
+               getClientSecret().isNotEmpty() &&
+               getRefreshToken().isNotEmpty()
+    }
+
+    /**
+     * Returns true if we already have a cached access token (may be expired).
+     */
+    fun hasToken(): Boolean = !getAccessToken().isNullOrEmpty()
 
     fun getAccessToken(): String? = prefs.getString(KEY_ACCESS_TOKEN, null)
-    fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
 
-    fun hasToken(): Boolean = !getAccessToken().isNullOrEmpty()
+    private fun saveAccessToken(token: String, expiresInSeconds: Long = 3600) {
+        prefs.edit()
+            .putString(KEY_ACCESS_TOKEN, token.trim())
+            .putLong(KEY_EXPIRES_AT, System.currentTimeMillis() + (expiresInSeconds * 1000))
+            .apply()
+        Log.d(TAG, "Access token saved, expires in ${expiresInSeconds}s")
+    }
 
     fun clear() {
         prefs.edit()
@@ -74,67 +91,44 @@ class OAuthManager(private val context: Context) {
             .apply()
     }
 
-    fun getAuthUrl(clientId: String? = null, redirectUri: String = REDIRECT_URI): String {
-        val cId = if (!clientId.isNullOrEmpty()) {
-            clientId
-        } else {
-            getClientId()
-        }
-
-        return StringBuilder(AUTH_ENDPOINT)
-            .append("?client_id=").append(URLEncoder.encode(cId, "UTF-8"))
-            .append("&redirect_uri=").append(URLEncoder.encode(redirectUri, "UTF-8"))
-            .append("&response_type=code")
-            .append("&scope=").append(URLEncoder.encode(SCOPE, "UTF-8"))
-            .append("&access_type=offline")
-            .append("&prompt=consent")
-            .toString()
-    }
-
     /**
-     * Constructs the Google OAuth URL and opens it in Chrome Custom Tabs
+     * THE CORE METHOD — called on app startup and before every API call.
+     *
+     * 1. If we have a valid (non-expired) cached access token → return it immediately.
+     * 2. If the token is expired or missing → use the refresh token to get a new one silently.
+     * 3. No UI involved whatsoever.
+     *
+     * Returns null only if credentials are missing or the refresh fails.
      */
-    fun startOAuthLogin(activityContext: Context, clientId: String? = null, clientSecret: String? = null, redirectUri: String = REDIRECT_URI) {
-        val cId = if (!clientId.isNullOrEmpty()) {
-            saveCredentials(clientId, clientSecret ?: "")
-            clientId
-        } else {
-            getClientId()
+    suspend fun getValidToken(): String? = withContext(Dispatchers.IO) {
+        // Check if cached token is still valid (with 2-minute buffer)
+        val cachedToken = getAccessToken()
+        val expiresAt = prefs.getLong(KEY_EXPIRES_AT, 0L)
+        if (!cachedToken.isNullOrEmpty() && System.currentTimeMillis() < (expiresAt - 120_000)) {
+            Log.d(TAG, "Using cached access token (valid for ${(expiresAt - System.currentTimeMillis()) / 1000}s)")
+            return@withContext cachedToken
         }
 
-        if (cId.isEmpty()) {
-            throw IllegalArgumentException("Client ID is required for Google Sign-In.")
+        // Token is expired or missing — refresh it silently
+        val refreshToken = getRefreshToken()
+        val clientId = getClientId()
+        val clientSecret = getClientSecret()
+
+        if (refreshToken.isEmpty() || clientId.isEmpty()) {
+            Log.e(TAG, "Cannot refresh: missing credentials (clientId=${clientId.isNotEmpty()}, refreshToken=${refreshToken.isNotEmpty()})")
+            return@withContext cachedToken // Return stale token as last resort
         }
 
-        val authUrl = getAuthUrl(cId, redirectUri)
-        val uri = Uri.parse(authUrl)
+        Log.d(TAG, "Refreshing access token silently...")
+
         try {
-            val customTabsIntent = CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
-            customTabsIntent.launchUrl(activityContext, uri)
-        } catch (e: Exception) {
-            val browserIntent = Intent(Intent.ACTION_VIEW, uri)
-            activityContext.startActivity(browserIntent)
-        }
-    }
-
-    /**
-     * Exchanges auth code for access_token and refresh_token
-     */
-    suspend fun exchangeCodeForToken(code: String, redirectUri: String = REDIRECT_URI): Result<String> = withContext(Dispatchers.IO) {
-        try {
-            val cId = getClientId()
-            val cSecret = getClientSecret()
-
             val formBuilder = FormBody.Builder()
-                .add("code", code)
-                .add("client_id", cId)
-                .add("redirect_uri", redirectUri)
-                .add("grant_type", "authorization_code")
+                .add("refresh_token", refreshToken)
+                .add("client_id", clientId)
+                .add("grant_type", "refresh_token")
 
-            if (cSecret.isNotEmpty()) {
-                formBuilder.add("client_secret", cSecret)
+            if (clientSecret.isNotEmpty()) {
+                formBuilder.add("client_secret", clientSecret)
             }
 
             val request = Request.Builder()
@@ -144,65 +138,36 @@ class OAuthManager(private val context: Context) {
 
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string() ?: ""
+
                 if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("Token exchange failed ($response.code): $body"))
+                    Log.e(TAG, "Token refresh failed (${response.code}): $body")
+                    return@withContext cachedToken // Return stale token as fallback
                 }
 
-                val json = JSONObject(body)
-                val accessToken = json.getString("access_token")
-                val refreshToken = json.optString("refresh_token", null)
-                val expiresIn = json.optLong("expires_in", 3600L)
-
-                saveAccessToken(accessToken, refreshToken, expiresIn)
-                Result.success(accessToken)
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Refreshes the access token using the stored refresh_token if expired
-     */
-    suspend fun getValidToken(): String? = withContext(Dispatchers.IO) {
-        val currentToken = getAccessToken() ?: return@withContext null
-        val expiresAt = prefs.getLong(KEY_EXPIRES_AT, 0L)
-        val refreshToken = getRefreshToken()
-
-        // If expires in more than 2 minutes, token is still valid
-        if (System.currentTimeMillis() < (expiresAt - 120000) || refreshToken.isNullOrEmpty()) {
-            return@withContext currentToken
-        }
-
-        // Refresh the token
-        try {
-            val formBuilder = FormBody.Builder()
-                .add("refresh_token", refreshToken)
-                .add("client_id", getClientId())
-                .add("grant_type", "refresh_token")
-
-            val cSecret = getClientSecret()
-            if (cSecret.isNotEmpty()) {
-                formBuilder.add("client_secret", cSecret)
-            }
-
-            val request = Request.Builder()
-                .url(TOKEN_ENDPOINT)
-                .post(formBuilder.build())
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext currentToken
-                val body = response.body?.string() ?: return@withContext currentToken
                 val json = JSONObject(body)
                 val newToken = json.getString("access_token")
                 val expiresIn = json.optLong("expires_in", 3600L)
 
-                saveAccessToken(newToken, null, expiresIn)
+                saveAccessToken(newToken, expiresIn)
+                Log.d(TAG, "Token refreshed successfully!")
                 return@withContext newToken
             }
         } catch (e: Exception) {
-            return@withContext currentToken
+            Log.e(TAG, "Token refresh exception: ${e.message}", e)
+            return@withContext cachedToken
         }
+    }
+
+    /**
+     * Performs the initial silent authentication on first app launch.
+     * Uses the baked-in refresh token to obtain the very first access token.
+     * Returns the access token on success, null on failure.
+     */
+    suspend fun silentSignIn(): String? {
+        if (!hasCredentials()) {
+            Log.e(TAG, "Silent sign-in impossible: missing credentials")
+            return null
+        }
+        return getValidToken()
     }
 }
