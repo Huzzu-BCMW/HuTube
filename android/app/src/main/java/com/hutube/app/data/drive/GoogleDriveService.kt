@@ -45,7 +45,7 @@ class GoogleDriveService(private val tokenProvider: () -> String?) {
         val fields = URLEncoder.encode("nextPageToken, files(id, name, mimeType, size, thumbnailLink, hasThumbnail, videoMediaMetadata)", "UTF-8")
 
         do {
-            val urlBuilder = StringBuilder("https://www.googleapis.com/drive/v3/files?q=$encodedQuery&pageSize=100&fields=$fields&orderBy=name natural")
+            val urlBuilder = StringBuilder("https://www.googleapis.com/drive/v3/files?q=$encodedQuery&pageSize=100&fields=$fields&orderBy=name")
             if (pageToken != null) {
                 urlBuilder.append("&pageToken=").append(URLEncoder.encode(pageToken, "UTF-8"))
             }
