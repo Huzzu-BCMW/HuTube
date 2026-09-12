@@ -59,33 +59,36 @@ fun HomeScreen(
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = BrandRed,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(24.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Hu", color = Color.White, fontWeight = FontWeight.Black, fontSize = 22.sp)
-                        Text("Tube", color = BrandRed, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                        Text("Hu", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text("Tube", color = BrandRed, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     }
                 },
                 actions = {
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White)
-                    }
                     IconButton(onClick = onRefresh) {
                         if (catalog.isScanning) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandRed, strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White)
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.LightGray)
                         }
                     }
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.LightGray)
+                    }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.LightGray)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground.copy(alpha = 0.95f))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DarkBackground.copy(alpha = 0.95f),
+                    scrolledContainerColor = DarkBackground
+                )
             )
         },
         containerColor = DarkBackground
@@ -123,9 +126,9 @@ fun HomeScreen(
                         Text(
                             text = "🕒  Continue Watching",
                             color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                         )
 
                         LazyRow(
@@ -223,8 +226,8 @@ fun ContinueWatchingCard(
 ) {
     Column(
         modifier = modifier
-            .width(180.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .width(160.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(CardBackground)
             .clickable { onClick() }
     ) {
@@ -267,16 +270,17 @@ fun ContinueWatchingCard(
             }
         }
 
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
             Text(
                 text = item.title,
                 color = Color.White,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             item.seriesTitle?.let {
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "$it · Ep ${item.episode ?: 1}",
                     color = Color.Gray,

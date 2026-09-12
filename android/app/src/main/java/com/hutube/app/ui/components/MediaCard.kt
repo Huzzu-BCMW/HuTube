@@ -51,8 +51,8 @@ fun MediaCard(
 
     Column(
         modifier = modifier
-            .width(160.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .width(140.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(CardBackground)
             .clickable { onClick() }
     ) {
@@ -85,7 +85,7 @@ fun MediaCard(
                         if (isShow) Icons.Default.Tv else Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = Color.Gray,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -95,14 +95,14 @@ fun MediaCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
+                        .padding(4.dp)
                         .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = badge,
                         color = Color.White,
-                        fontSize = 9.sp,
+                        fontSize = 8.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -131,21 +131,21 @@ fun MediaCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
         ) {
             Text(
                 text = title,
                 color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
-                color = Color.LightGray,
-                fontSize = 11.sp,
+                color = Color.Gray,
+                fontSize = 10.sp,
                 maxLines = 1
             )
         }

@@ -157,18 +157,32 @@ class DriveRepository(private val driveService: GoogleDriveService) {
 
         for (showFolder in showFolders) {
             val showChildren = driveService.listFolderChildren(showFolder.id)
-            val subFolders = showChildren.filter { it.isFolder }
             val directVideos = showChildren.filter { driveService.isVideo(it) }
+            val subFolders = showChildren.filter { it.isFolder }
 
             val seasons = mutableListOf<SeasonItem>()
             val directEpisodes = mutableListOf<MediaItem>()
 
-            if (subFolders.isNotEmpty()) {
-                // Has seasons
-                var seasonIndex = 1
-                for (seasonFolder in subFolders) {
-                    val seasonFiles = driveService.listFolderChildren(seasonFolder.id)
-                    val seasonEpisodes = seasonFiles.filter { driveService.isVideo(it) }.map {
+            // Recursive function to find all folders that contain videos
+            suspend fun findVideoFolders(folder: DriveFile): List<Pair<DriveFile, List<DriveFile>>> {
+                val result = mutableListOf<Pair<DriveFile, List<DriveFile>>>()
+                val children = driveService.listFolderChildren(folder.id)
+                val videos = children.filter { driveService.isVideo(it) }
+                if (videos.isNotEmpty()) {
+                    result.add(Pair(folder, videos))
+                }
+                val subs = children.filter { it.isFolder }
+                for (sub in subs) {
+                    result.addAll(findVideoFolders(sub))
+                }
+                return result
+            }
+
+            var seasonIndex = 1
+            for (sub in subFolders) {
+                val videoFolders = findVideoFolders(sub)
+                for ((seasonFolder, videos) in videoFolders) {
+                    val seasonEpisodes = videos.map {
                         val (sNum, epNum) = driveService.parseEpisodeInfo(it.name)
                         toMediaItem(it, category, showFolder.name, sNum, epNum)
                     }.sortedBy { it.episode ?: 0 }
@@ -176,21 +190,23 @@ class DriveRepository(private val driveService: GoogleDriveService) {
                     seasons.add(
                         SeasonItem(
                             id = seasonFolder.id,
-                            name = seasonFolder.name,
+                            name = seasonFolder.name, // Will be "Season 1", "Movies", etc.
                             seasonNumber = seasonIndex++,
                             episodes = seasonEpisodes
                         )
                     )
                 }
-            } else {
-                // Direct episodes
-                directEpisodes.addAll(
-                    directVideos.map {
-                        val (sNum, epNum) = driveService.parseEpisodeInfo(it.name)
-                        toMediaItem(it, category, showFolder.name, sNum, epNum)
-                    }.sortedBy { it.episode ?: 0 }
-                )
             }
+
+            // Direct episodes
+            directEpisodes.addAll(
+                directVideos.map {
+                    val (sNum, epNum) = driveService.parseEpisodeInfo(it.name)
+                    toMediaItem(it, category, showFolder.name, sNum, epNum)
+                }.sortedBy { it.episode ?: 0 }
+            )
+            
+            if (seasons.isEmpty() && directEpisodes.isEmpty()) continue
 
             val firstThumb = seasons.firstOrNull()?.episodes?.firstOrNull()?.thumbnailLink
                 ?: directEpisodes.firstOrNull()?.thumbnailLink

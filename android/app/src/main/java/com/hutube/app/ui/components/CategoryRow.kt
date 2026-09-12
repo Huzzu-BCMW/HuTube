@@ -27,21 +27,20 @@ fun CategoryRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "${category.icon}  ${category.title}",
                 color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "(${items.size})",
                 color = Color.Gray,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Normal
+                fontSize = 12.sp
             )
         }
 
