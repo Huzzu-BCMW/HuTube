@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -8,7 +10,7 @@ android {
     compileSdk = 34
 
     val credentialsFile = rootProject.file("credentials.properties")
-    val credentialsProps = java.util.Properties()
+    val credentialsProps = Properties()
     if (credentialsFile.exists()) {
         credentialsProps.load(credentialsFile.inputStream())
     }
