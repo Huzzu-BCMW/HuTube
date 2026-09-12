@@ -7,6 +7,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -38,35 +40,63 @@ class MainActivity : ComponentActivity() {
     private var accessToken by mutableStateOf<String?>(null)
     private var isLoading by mutableStateOf(true)
     private var errorMessage by mutableStateOf<String?>(null)
+    private var debugInfo by mutableStateOf("")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         oauthManager = OAuthManager(this)
+
+        // The token provider calls getValidToken() to always get a fresh token
+        // (refreshes automatically if expired)
         driveService = GoogleDriveService {
-            // Always provide a fresh token for every API call
             oauthManager.getAccessToken()
         }
         driveRepository = DriveRepository(driveService)
+
+        // Check what credentials we have baked in
+        val hasClientId = BuildConfig.DEFAULT_CLIENT_ID.isNotEmpty()
+        val hasClientSecret = BuildConfig.DEFAULT_CLIENT_SECRET.isNotEmpty()
+        val hasRefreshToken = BuildConfig.DEFAULT_REFRESH_TOKEN.isNotEmpty()
+        debugInfo = "ClientID: ${if (hasClientId) "✅" else "❌"} | Secret: ${if (hasClientSecret) "✅" else "❌"} | RefreshToken: ${if (hasRefreshToken) "✅" else "❌"}"
+        Log.d("MainActivity", "Credentials check: $debugInfo")
 
         // Silently authenticate on startup — ZERO login UI
         lifecycleScope.launch {
             try {
                 Log.d("MainActivity", "Starting silent authentication...")
+                debugInfo += "\n⏳ Refreshing token..."
+
                 val token = oauthManager.silentSignIn()
+
                 if (token != null) {
                     accessToken = token
+                    debugInfo += "\n✅ Token: ${token.take(15)}..."
                     Log.d("MainActivity", "Silent auth successful, scanning Drive...")
+
+                    debugInfo += "\n⏳ Scanning Google Drive..."
                     driveRepository.scanDrive()
+
+                    val catalog = driveRepository.catalog.value
+                    val totalItems = catalog.anime.size + catalog.cartoon.size + catalog.series.size + catalog.movies.size + catalog.news.size
+                    debugInfo += "\n✅ Found: ${catalog.anime.size} anime, ${catalog.cartoon.size} cartoon, ${catalog.series.size} series, ${catalog.movies.size} movies, ${catalog.news.size} news"
+                    debugInfo += "\nTotal: $totalItems items"
+
+                    if (catalog.error != null) {
+                        debugInfo += "\n❌ Scan error: ${catalog.error}"
+                    }
+
                     isLoading = false
                 } else {
                     Log.e("MainActivity", "Silent auth failed — no token returned")
-                    errorMessage = "Authentication failed. Make sure GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, and GDRIVE_REFRESH_TOKEN are set in GitHub Secrets."
+                    debugInfo += "\n❌ Token refresh returned null!"
+                    errorMessage = "Authentication failed.\n\n$debugInfo"
                     isLoading = false
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Auth exception: ${e.message}", e)
-                errorMessage = "Error: ${e.message}"
+                debugInfo += "\n❌ Exception: ${e.message}"
+                errorMessage = "Error: ${e.message}\n\n$debugInfo"
                 isLoading = false
             }
         }
@@ -79,7 +109,7 @@ class MainActivity : ComponentActivity() {
                 when {
                     // Loading splash while authenticating silently
                     isLoading -> {
-                        SplashScreen()
+                        SplashScreen(debugInfo)
                     }
 
                     // Error state — credentials are missing or broken
@@ -126,7 +156,8 @@ class MainActivity : ComponentActivity() {
                                 selectedShow = show
                             },
                             onOpenSearch = {
-                                // Search functionality
+                                // Show debug info as toast for diagnostics
+                                Toast.makeText(this, debugInfo, Toast.LENGTH_LONG).show()
                             },
                             onOpenSettings = {
                                 // Sign Out
@@ -145,11 +176,10 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Splash screen shown while silently authenticating with Google Drive.
- * User sees this for ~1 second on first launch, then goes straight to content.
+ * Splash screen with debug info visible so user can screenshot if it gets stuck.
  */
 @Composable
-private fun SplashScreen() {
+private fun SplashScreen(debugInfo: String = "") {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -177,13 +207,23 @@ private fun SplashScreen() {
                 color = Color.Gray,
                 fontSize = 14.sp
             )
+
+            if (debugInfo.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = debugInfo,
+                    color = Color.DarkGray,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                )
+            }
         }
     }
 }
 
 /**
- * Error screen shown only if credentials are missing from the build.
- * Normal users should never see this — it means the APK was built without secrets.
+ * Error screen with full debug details so user can screenshot for diagnosis.
  */
 @Composable
 private fun ErrorScreen(message: String) {
@@ -194,7 +234,10 @@ private fun ErrorScreen(message: String) {
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.verticalScroll(rememberScrollState())
+        ) {
             Row {
                 Text("Hu", color = Color.White, fontWeight = FontWeight.Black, fontSize = 36.sp)
                 Text("Tube", color = BrandRed, fontWeight = FontWeight.Black, fontSize = 36.sp)
