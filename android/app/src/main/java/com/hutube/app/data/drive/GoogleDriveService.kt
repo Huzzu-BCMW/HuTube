@@ -1,5 +1,6 @@
 package com.hutube.app.data.drive
 
+import android.util.Log
 import com.hutube.app.data.model.Category
 import com.hutube.app.data.model.MediaItem
 import com.hutube.app.data.model.SeasonItem
@@ -14,6 +15,10 @@ import java.util.regex.Pattern
 
 class GoogleDriveService(private val tokenProvider: () -> String?) {
 
+    companion object {
+        private const val TAG = "GoogleDriveService"
+    }
+
     private val client = OkHttpClient.Builder().build()
 
     private val videoExtensions = listOf(".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv", ".m4v", ".ts")
@@ -25,7 +30,9 @@ class GoogleDriveService(private val tokenProvider: () -> String?) {
     }
 
     suspend fun searchFolders(): List<DriveFile> = withContext(Dispatchers.IO) {
-        val token = tokenProvider() ?: return@withContext emptyList()
+        val token = tokenProvider()
+        Log.d(TAG, "searchFolders: token=${if (token != null) "${token.take(10)}..." else "NULL"}")
+        if (token == null) return@withContext emptyList()
         val query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         fetchFiles(token, query)
     }
@@ -50,10 +57,15 @@ class GoogleDriveService(private val tokenProvider: () -> String?) {
 
             try {
                 client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return result
+                    if (!response.isSuccessful) {
+                        val errorBody = response.body?.string() ?: ""
+                        Log.e(TAG, "API error (${response.code}): $errorBody")
+                        return result
+                    }
                     val body = response.body?.string() ?: return result
                     val json = JSONObject(body)
                     val filesArray = json.optJSONArray("files") ?: return result
+                    Log.d(TAG, "fetchFiles page: got ${filesArray.length()} items")
 
                     for (i in 0 until filesArray.length()) {
                         val obj = filesArray.getJSONObject(i)

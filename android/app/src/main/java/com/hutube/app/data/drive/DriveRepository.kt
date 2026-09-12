@@ -1,5 +1,6 @@
 package com.hutube.app.data.drive
 
+import android.util.Log
 import com.hutube.app.data.model.Category
 import com.hutube.app.data.model.MediaItem
 import com.hutube.app.data.model.SeasonItem
@@ -22,20 +23,29 @@ data class CatalogData(
 
 class DriveRepository(private val driveService: GoogleDriveService) {
 
+    companion object {
+        private const val TAG = "DriveRepository"
+    }
+
     private val _catalog = MutableStateFlow(CatalogData())
     val catalog: StateFlow<CatalogData> = _catalog
 
     suspend fun scanDrive() = withContext(Dispatchers.IO) {
         _catalog.value = _catalog.value.copy(isScanning = true, error = null)
+        Log.d(TAG, "=== Starting Drive scan ===")
 
         try {
             val rootFolders = driveService.searchFolders()
+            Log.d(TAG, "Found ${rootFolders.size} total folders in Drive")
+            rootFolders.forEach { Log.d(TAG, "  Folder: '${it.name}' (${it.id})") }
 
             val animeFolders = rootFolders.filter { it.name.contains("anime", ignoreCase = true) }
             val cartoonFolders = rootFolders.filter { it.name.contains("cartoon", ignoreCase = true) || it.name.contains("animation", ignoreCase = true) }
             val seriesFolders = rootFolders.filter { it.name.contains("series", ignoreCase = true) || it.name.contains("show", ignoreCase = true) }
             val movieFolders = rootFolders.filter { it.name.contains("movie", ignoreCase = true) || it.name.contains("film", ignoreCase = true) }
             val newsFolders = rootFolders.filter { it.name.contains("funny breaking news", ignoreCase = true) || it.name.contains("news", ignoreCase = true) }
+
+            Log.d(TAG, "Matched: anime=${animeFolders.size}, cartoon=${cartoonFolders.size}, series=${seriesFolders.size}, movies=${movieFolders.size}, news=${newsFolders.size}")
 
             val movies = mutableListOf<MediaItem>()
             val series = mutableListOf<ShowItem>()
@@ -115,6 +125,8 @@ class DriveRepository(private val driveService: GoogleDriveService) {
                 }
             }
 
+            Log.d(TAG, "=== Scan complete: anime=${anime.size}, cartoon=${cartoon.size}, series=${series.size}, movies=${movies.size}, news=${news.size}, total=${allVideos.size} ===")
+
             _catalog.value = CatalogData(
                 anime = anime,
                 cartoon = cartoon,
@@ -127,6 +139,7 @@ class DriveRepository(private val driveService: GoogleDriveService) {
             )
 
         } catch (e: Exception) {
+            Log.e(TAG, "!!! Scan FAILED: ${e.message}", e)
             _catalog.value = _catalog.value.copy(isScanning = false, error = e.localizedMessage)
             e.printStackTrace()
         }
