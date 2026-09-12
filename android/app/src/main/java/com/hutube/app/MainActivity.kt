@@ -79,11 +79,14 @@ class MainActivity : ComponentActivity() {
 
                     val catalog = driveRepository.catalog.value
                     val totalItems = catalog.anime.size + catalog.cartoon.size + catalog.series.size + catalog.movies.size + catalog.news.size
-                    debugInfo += "\n✅ Found: ${catalog.anime.size} anime, ${catalog.cartoon.size} cartoon, ${catalog.series.size} series, ${catalog.movies.size} movies, ${catalog.news.size} news"
-                    debugInfo += "\nTotal: $totalItems items"
+                    debugInfo += "\n📊 anime=${catalog.anime.size} cartoon=${catalog.cartoon.size} series=${catalog.series.size} movies=${catalog.movies.size} news=${catalog.news.size}"
 
                     if (catalog.error != null) {
                         debugInfo += "\n❌ Scan error: ${catalog.error}"
+                        errorMessage = "Scan Failed:\n$debugInfo"
+                    } else if (totalItems == 0) {
+                        debugInfo += "\n⚠️ 0 items found. Check: Is Google Drive API enabled? Do you have folders named Anime/Cartoon/Series/Movies/News?"
+                        errorMessage = "No matching folders found.\n\n$debugInfo"
                     }
 
                     isLoading = false

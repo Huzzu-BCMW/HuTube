@@ -46,6 +46,12 @@ class DriveRepository(private val driveService: GoogleDriveService) {
             val newsFolders = rootFolders.filter { it.name.contains("funny breaking news", ignoreCase = true) || it.name.contains("news", ignoreCase = true) }
 
             Log.d(TAG, "Matched: anime=${animeFolders.size}, cartoon=${cartoonFolders.size}, series=${seriesFolders.size}, movies=${movieFolders.size}, news=${newsFolders.size}")
+            
+            // If we found root folders but 0 of them matched our categories, throw a descriptive error
+            if (rootFolders.isNotEmpty() && animeFolders.isEmpty() && cartoonFolders.isEmpty() && seriesFolders.isEmpty() && movieFolders.isEmpty() && newsFolders.isEmpty()) {
+                val folderNames = rootFolders.take(15).joinToString(", ") { it.name }
+                throw Exception("Found folders, but none matched category names (Anime/Cartoon/Series/Movies/News). Folders found: $folderNames...")
+            }
 
             val movies = mutableListOf<MediaItem>()
             val series = mutableListOf<ShowItem>()

@@ -60,7 +60,7 @@ class GoogleDriveService(private val tokenProvider: () -> String?) {
                     if (!response.isSuccessful) {
                         val errorBody = response.body?.string() ?: ""
                         Log.e(TAG, "API error (${response.code}): $errorBody")
-                        return result
+                        throw Exception("Google Drive API Error (${response.code}): $errorBody")
                     }
                     val body = response.body?.string() ?: return result
                     val json = JSONObject(body)
@@ -109,8 +109,8 @@ class GoogleDriveService(private val tokenProvider: () -> String?) {
                     pageToken = json.optString("nextPageToken", null)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
-                break
+                Log.e(TAG, "Network exception during API call", e)
+                throw e
             }
         } while (pageToken != null)
 
