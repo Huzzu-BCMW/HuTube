@@ -109,9 +109,14 @@ class PlayerActivity : ComponentActivity() {
             })
         }
 
-        val factory = DriveMediaSourceFactory(this) { accessToken }
-        val source = factory.createMediaSource(currentMedia.id)
-        player?.setMediaSource(source)
+        if (currentMedia.id.startsWith("file://")) {
+            val source = androidx.media3.common.MediaItem.fromUri(currentMedia.id)
+            player?.setMediaItem(source)
+        } else {
+            val factory = DriveMediaSourceFactory(this) { accessToken }
+            val source = factory.createMediaSource(currentMedia.id)
+            player?.setMediaSource(source)
+        }
         player?.prepare()
 
         // Restore saved position
@@ -230,10 +235,43 @@ fun PlayerScreen(
         }
     }
 
+    LaunchedEffect(showControls, isPlaying) {
+        if (showControls && isPlaying) {
+            kotlinx.coroutines.delay(5000)
+            showControls = false
+        }
+    }
+
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .androidx.compose.ui.focus.focusRequester(focusRequester)
+            .androidx.compose.ui.input.key.onKeyEvent { event ->
+                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyUp) {
+                    when (event.key) {
+                        androidx.compose.ui.input.key.Key.DirectionLeft -> {
+                            player?.seekTo((player.currentPosition - 10000).coerceAtLeast(0L))
+                            showControls = true
+                            true
+                        }
+                        androidx.compose.ui.input.key.Key.DirectionRight -> {
+                            player?.seekTo((player.currentPosition + 10000).coerceAtMost(player?.duration ?: 0L))
+                            showControls = true
+                            true
+                        }
+                        androidx.compose.ui.input.key.Key.DirectionCenter, androidx.compose.ui.input.key.Key.Enter -> {
+                            showControls = !showControls
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+            .androidx.compose.foundation.focusable()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null

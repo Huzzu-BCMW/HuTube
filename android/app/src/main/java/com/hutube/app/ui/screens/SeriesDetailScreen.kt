@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,7 +35,8 @@ import com.hutube.app.ui.theme.DarkBackground
 fun SeriesDetailScreen(
     show: ShowItem,
     onBack: () -> Unit,
-    onPlayEpisode: (MediaItem, MediaItem?) -> Unit
+    onPlayEpisode: (MediaItem, MediaItem?) -> Unit,
+    onDownload: (MediaItem) -> Unit
 ) {
     val hasSeasons = show.seasons.isNotEmpty()
     var selectedSeasonIdx by remember { mutableIntStateOf(0) }
@@ -255,6 +257,11 @@ fun SeriesDetailScreen(
                                 Text(it, color = BrandRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
+                    }
+                    
+                    // Download Button
+                    IconButton(onClick = { onDownload(episode) }) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = "Download", tint = Color.LightGray)
                     }
                 }
             }

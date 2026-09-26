@@ -44,6 +44,7 @@ fun HomeScreen(
     onPlayMedia: (MediaItem, MediaItem?) -> Unit, // media, nextMedia
     onOpenShow: (ShowItem) -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     val history = remember { mutableStateOf(HuTubeApplication.instance.watchHistoryManager.getHistory()) }
@@ -82,6 +83,9 @@ fun HomeScreen(
                     }
                     IconButton(onClick = onOpenSearch) {
                         Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.LightGray)
+                    }
+                    IconButton(onClick = onOpenDownloads) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = "Downloads", tint = Color.LightGray)
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.LightGray)

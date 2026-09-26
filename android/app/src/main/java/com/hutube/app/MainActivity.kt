@@ -1,4 +1,4 @@
-package com.hutube.app
+﻿package com.hutube.app
 
 import android.os.Bundle
 import android.util.Log
@@ -64,47 +64,47 @@ class MainActivity : ComponentActivity() {
         val hasClientId = BuildConfig.DEFAULT_CLIENT_ID.isNotEmpty()
         val hasClientSecret = BuildConfig.DEFAULT_CLIENT_SECRET.isNotEmpty()
         val hasRefreshToken = BuildConfig.DEFAULT_REFRESH_TOKEN.isNotEmpty()
-        debugInfo = "ClientID: ${if (hasClientId) "✅" else "❌"} | Secret: ${if (hasClientSecret) "✅" else "❌"} | RefreshToken: ${if (hasRefreshToken) "✅" else "❌"}"
+        debugInfo = "ClientID: ${if (hasClientId) "âœ…" else "âŒ"} | Secret: ${if (hasClientSecret) "âœ…" else "âŒ"} | RefreshToken: ${if (hasRefreshToken) "âœ…" else "âŒ"}"
         Log.d("MainActivity", "Credentials check: $debugInfo")
 
-        // Silently authenticate on startup — ZERO login UI
+        // Silently authenticate on startup â€” ZERO login UI
         lifecycleScope.launch {
             try {
                 Log.d("MainActivity", "Starting silent authentication...")
-                debugInfo += "\n⏳ Refreshing token..."
+                debugInfo += "\nâ³ Refreshing token..."
 
                 val token = oauthManager.silentSignIn()
 
                 if (token != null) {
                     accessToken = token
-                    debugInfo += "\n✅ Token: ${token.take(15)}..."
+                    debugInfo += "\nâœ… Token: ${token.take(15)}..."
                     Log.d("MainActivity", "Silent auth successful, scanning Drive...")
 
-                    debugInfo += "\n⏳ Scanning Google Drive..."
+                    debugInfo += "\nâ³ Scanning Google Drive..."
                     driveRepository.scanDrive()
 
                     val catalog = driveRepository.catalog.value
                     val totalItems = catalog.anime.size + catalog.cartoon.size + catalog.series.size + catalog.movies.size + catalog.news.size
-                    debugInfo += "\n📊 anime=${catalog.anime.size} cartoon=${catalog.cartoon.size} series=${catalog.series.size} movies=${catalog.movies.size} news=${catalog.news.size}"
+                    debugInfo += "\nðŸ“Š anime=${catalog.anime.size} cartoon=${catalog.cartoon.size} series=${catalog.series.size} movies=${catalog.movies.size} news=${catalog.news.size}"
 
                     if (catalog.error != null) {
-                        debugInfo += "\n❌ Scan error: ${catalog.error}"
+                        debugInfo += "\nâŒ Scan error: ${catalog.error}"
                         errorMessage = "Scan Failed:\n$debugInfo"
                     } else if (totalItems == 0) {
-                        debugInfo += "\n⚠️ 0 items found. Check: Is Google Drive API enabled? Do you have folders named Anime/Cartoon/Series/Movies/News?"
+                        debugInfo += "\nâš ï¸ 0 items found. Check: Is Google Drive API enabled? Do you have folders named Anime/Cartoon/Series/Movies/News?"
                         errorMessage = "No matching folders found.\n\n$debugInfo"
                     }
 
                     isLoading = false
                 } else {
-                    Log.e("MainActivity", "Silent auth failed — no token returned")
-                    debugInfo += "\n❌ Token refresh returned null!"
+                    Log.e("MainActivity", "Silent auth failed â€” no token returned")
+                    debugInfo += "\nâŒ Token refresh returned null!"
                     errorMessage = "Authentication failed.\n\n$debugInfo"
                     isLoading = false
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Auth exception: ${e.message}", e)
-                debugInfo += "\n❌ Exception: ${e.message}"
+                debugInfo += "\nâŒ Exception: ${e.message}"
                 errorMessage = "Error: ${e.message}\n\n$debugInfo"
                 isLoading = false
             }
@@ -121,9 +121,27 @@ class MainActivity : ComponentActivity() {
                         SplashScreen(debugInfo)
                     }
 
-                    // Error state — credentials are missing or broken
+                    // Error state â€” credentials are missing or broken
                     errorMessage != null -> {
                         ErrorScreen(message = errorMessage!!)
+                    }
+
+                    showDownloads -> {
+                        val downloader = remember { com.hutube.app.data.download.DownloadManagerHelper(this@MainActivity) }
+                        val files = downloader.getDownloadedFiles()
+                        
+                        com.hutube.app.ui.screens.DownloadsScreen(
+                            files = files,
+                            onBack = { showDownloads = false },
+                            onPlayFile = { media ->
+                                PlayerActivity.start(
+                                    context = this@MainActivity,
+                                    media = media,
+                                    nextMedia = null,
+                                    token = accessToken ?: ""
+                                )
+                            }
+                        )
                     }
 
                     // Series detail view
@@ -138,11 +156,15 @@ class MainActivity : ComponentActivity() {
                                     nextMedia = nextMedia,
                                     token = accessToken ?: ""
                                 )
+                            },
+                            onDownload = { media ->
+                                val downloader = com.hutube.app.data.download.DownloadManagerHelper(this)
+                                downloader.startDownload(media, accessToken ?: "")
                             }
                         )
                     }
 
-                    // Main home screen — the default landing page
+                    // Main home screen â€” the default landing page
                     else -> {
                         HomeScreen(
                             catalog = catalog,
@@ -164,6 +186,7 @@ class MainActivity : ComponentActivity() {
                             onOpenShow = { show ->
                                 selectedShow = show
                             },
+                            onOpenDownloads = { showDownloads = true },
                             onOpenSearch = {
                                 // Show debug info as toast for diagnostics
                                 Toast.makeText(this, debugInfo, Toast.LENGTH_LONG).show()
@@ -255,7 +278,7 @@ private fun ErrorScreen(message: String) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "⚠️ Configuration Error",
+                text = "âš ï¸ Configuration Error",
                 color = Color(0xFFFF6B6B),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
@@ -273,3 +296,6 @@ private fun ErrorScreen(message: String) {
         }
     }
 }
+
+
+
