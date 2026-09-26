@@ -1,4 +1,4 @@
-﻿package com.hutube.app.player
+package com.hutube.app.player
 
 import android.app.PictureInPictureParams
 import android.content.Context
@@ -52,6 +52,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.hutube.app.HuTubeApplication
 import com.hutube.app.data.model.MediaItem
+import kotlinx.coroutines.delay
 import java.io.Serializable
 
 @OptIn(UnstableApi::class)
