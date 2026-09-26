@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
             HuTubeTheme {
                 val catalog by driveRepository.catalog.collectAsState()
                 var selectedShow by remember { mutableStateOf<ShowItem?>(null) }
+                var showDownloads by remember { mutableStateOf(false) }
 
                 when {
                     // Loading splash while authenticating silently
@@ -296,6 +297,7 @@ private fun ErrorScreen(message: String) {
         }
     }
 }
+
 
 
 

@@ -1,4 +1,4 @@
-package com.hutube.app.player
+﻿package com.hutube.app.player
 
 import android.app.PictureInPictureParams
 import android.content.Context
@@ -29,6 +29,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -231,13 +238,13 @@ fun PlayerScreen(
                 currentPos = it.currentPosition
                 duration = it.duration.coerceAtLeast(0L)
             }
-            kotlinx.coroutines.delay(500)
+            delay(500)
         }
     }
 
     LaunchedEffect(showControls, isPlaying) {
         if (showControls && isPlaying) {
-            kotlinx.coroutines.delay(5000)
+            delay(5000)
             showControls = false
         }
     }
@@ -249,8 +256,8 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .androidx.compose.ui.focus.focusRequester(focusRequester)
-            .androidx.compose.ui.input.key.onKeyEvent { event ->
+            .focusRequester(focusRequester)
+            .onKeyEvent { event ->
                 if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyUp) {
                     when (event.key) {
                         androidx.compose.ui.input.key.Key.DirectionLeft -> {
@@ -271,7 +278,7 @@ fun PlayerScreen(
                     }
                 } else false
             }
-            .androidx.compose.foundation.focusable()
+            .focusable()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -358,7 +365,7 @@ fun PlayerScreen(
                             )
                             media.seriesTitle?.let {
                                 Text(
-                                    text = "$it · Episode ${media.episode ?: 1}",
+                                    text = "$it Â· Episode ${media.episode ?: 1}",
                                     color = Color.LightGray,
                                     fontSize = 14.sp
                                 )
@@ -525,3 +532,7 @@ private fun formatTime(millis: Long): String {
         String.format("%02d:%02d", minutes, seconds)
     }
 }
+
+
+
+

@@ -1,4 +1,4 @@
-package com.hutube.app.data.drive
+﻿package com.hutube.app.data.drive
 
 import android.util.Log
 import com.hutube.app.data.model.Category
@@ -9,6 +9,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 data class CatalogData(
     val anime: List<Any> = emptyList(), // Can contain ShowItem or MediaItem
@@ -60,9 +63,9 @@ class DriveRepository(private val driveService: GoogleDriveService) {
             val news = mutableListOf<MediaItem>()
             val allVideos = mutableListOf<MediaItem>()
 
-            kotlinx.coroutines.coroutineScope {
+            coroutineScope {
                 val movieJobs = movieFolders.map { mFolder ->
-                    kotlinx.coroutines.async {
+                    async {
                         val mFolderVideos = mutableListOf<MediaItem>()
                         val children = driveService.listFolderChildren(mFolder.id)
                         for (file in children) {
@@ -80,12 +83,12 @@ class DriveRepository(private val driveService: GoogleDriveService) {
                     }
                 }
 
-                val seriesJobs = seriesFolders.map { kotlinx.coroutines.async { scanShowsInFolder(it.id, Category.SERIES) } }
-                val animeJobs = animeFolders.map { kotlinx.coroutines.async { scanShowsInFolder(it.id, Category.ANIME) } }
-                val cartoonJobs = cartoonFolders.map { kotlinx.coroutines.async { scanShowsInFolder(it.id, Category.CARTOON) } }
+                val seriesJobs = seriesFolders.map { async { scanShowsInFolder(it.id, Category.SERIES) } }
+                val animeJobs = animeFolders.map { async { scanShowsInFolder(it.id, Category.ANIME) } }
+                val cartoonJobs = cartoonFolders.map { async { scanShowsInFolder(it.id, Category.CARTOON) } }
                 
                 val newsJobs = newsFolders.map { nFolder ->
-                    kotlinx.coroutines.async {
+                    async {
                         val nFolderVideos = mutableListOf<MediaItem>()
                         val children = driveService.listFolderChildren(nFolder.id)
                         for (file in children) {
@@ -114,7 +117,7 @@ class DriveRepository(private val driveService: GoogleDriveService) {
                 
                 // Anime single movies
                 val animeMovieJobs = animeFolders.map { aFolder ->
-                    kotlinx.coroutines.async {
+                    async {
                         val children = driveService.listFolderChildren(aFolder.id)
                         children.filter { driveService.isVideo(it) }.map { toMediaItem(it, Category.ANIME) }
                     }
@@ -131,7 +134,7 @@ class DriveRepository(private val driveService: GoogleDriveService) {
 
                 // Cartoon single movies
                 val cartoonMovieJobs = cartoonFolders.map { cFolder ->
-                    kotlinx.coroutines.async {
+                    async {
                         val children = driveService.listFolderChildren(cFolder.id)
                         children.filter { driveService.isVideo(it) }.map { toMediaItem(it, Category.CARTOON) }
                     }
@@ -167,11 +170,11 @@ class DriveRepository(private val driveService: GoogleDriveService) {
         }
     }
 
-    private suspend fun scanShowsInFolder(parentFolderId: String, category: Category): List<ShowItem> = kotlinx.coroutines.coroutineScope {
+    private suspend fun scanShowsInFolder(parentFolderId: String, category: Category): List<ShowItem> = coroutineScope {
         val showFolders = driveService.listFolderChildren(parentFolderId).filter { it.isFolder }
 
         val deferredShows = showFolders.map { showFolder ->
-            kotlinx.coroutines.async {
+            async {
                 val showChildren = driveService.listFolderChildren(showFolder.id)
                 val directVideos = showChildren.filter { driveService.isVideo(it) }
                 val subFolders = showChildren.filter { it.isFolder }
@@ -189,14 +192,14 @@ class DriveRepository(private val driveService: GoogleDriveService) {
                     }
                     val subs = children.filter { it.isFolder }
                     
-                    val subResults = subs.map { sub -> kotlinx.coroutines.async { findVideoFolders(sub) } }.awaitAll()
+                    val subResults = subs.map { sub -> async { findVideoFolders(sub) } }.awaitAll()
                     subResults.forEach { result.addAll(it) }
                     
                     return result
                 }
 
                 var seasonIndex = 1
-                val subFolderVideoFolders = subFolders.map { sub -> kotlinx.coroutines.async { findVideoFolders(sub) } }.awaitAll()
+                val subFolderVideoFolders = subFolders.map { sub -> async { findVideoFolders(sub) } }.awaitAll()
                 for (videoFolders in subFolderVideoFolders) {
                     for ((seasonFolder, videos) in videoFolders) {
                         val seasonEpisodes = videos.map {
@@ -266,3 +269,6 @@ class DriveRepository(private val driveService: GoogleDriveService) {
         )
     }
 }
+
+
+
