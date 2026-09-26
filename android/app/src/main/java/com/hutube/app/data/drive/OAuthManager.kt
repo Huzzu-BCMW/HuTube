@@ -141,7 +141,13 @@ class OAuthManager(private val context: Context) {
 
                 if (!response.isSuccessful) {
                     Log.e(TAG, "Token refresh failed (${response.code}): $body")
-                    return@withContext cachedToken // Return stale token as fallback
+                    
+                    // If we get a 400 Bad Request with "invalid_grant", the refresh token is expired or revoked.
+                    if (body.contains("invalid_grant")) {
+                        throw Exception("Refresh token expired or invalid. If your Google Cloud project is in 'Testing' mode, refresh tokens expire every 7 days. Please generate a new one.")
+                    } else {
+                        throw Exception("Token refresh failed (${response.code}): $body")
+                    }
                 }
 
                 val json = JSONObject(body)
@@ -154,7 +160,7 @@ class OAuthManager(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Token refresh exception: ${e.message}", e)
-            return@withContext cachedToken
+            throw e
         }
     }
 

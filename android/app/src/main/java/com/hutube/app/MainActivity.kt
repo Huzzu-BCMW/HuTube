@@ -50,7 +50,13 @@ class MainActivity : ComponentActivity() {
         // The token provider calls getValidToken() to always get a fresh token
         // (refreshes automatically if expired)
         driveService = GoogleDriveService {
-            oauthManager.getAccessToken()
+            kotlinx.coroutines.runBlocking {
+                try {
+                    oauthManager.getValidToken()
+                } catch (e: Exception) {
+                    null
+                }
+            }
         }
         driveRepository = DriveRepository(driveService)
 
