@@ -39,7 +39,7 @@ fun HeroBanner(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(300.dp)
+            .height(500.dp)
     ) {
         // Backdrop Image
         if (!thumbUrl.isNullOrEmpty()) {
@@ -57,16 +57,31 @@ fun HeroBanner(
             )
         }
 
-        // Dark Gradients
+        // Top Gradient Scrim
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(150.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xFF111111), Color.Transparent)
+                    )
+                )
+        )
+
+        // Bottom Gradient Scrim
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color(0xFF121212).copy(alpha = 0.7f),
-                            Color(0xFF121212)
+                            Color(0xFF111111).copy(alpha = 0.8f),
+                            Color(0xFF111111)
                         )
                     )
                 )
@@ -75,58 +90,65 @@ fun HeroBanner(
         // Overlay Info
         Column(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp)
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Category Badge
             Surface(
-                color = BrandRed,
-                shape = RoundedCornerShape(4.dp)
+                color = Color.White.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Text(
-                    text = "FEATURED $categoryName".uppercase(),
+                    text = categoryName.uppercase(),
                     color = Color.White,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = title,
                 color = Color.White,
-                fontSize = 24.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Black,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 32.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Button(
                     onClick = onPlay,
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(6.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Play", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Play", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
 
                 if (isShow) {
-                    OutlinedButton(
+                    Button(
                         onClick = onDetails,
-                        shape = RoundedCornerShape(6.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp)
                     ) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Episodes", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Info", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }

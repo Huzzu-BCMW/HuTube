@@ -81,23 +81,53 @@ fun HomeScreen(
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.LightGray)
                         }
                     }
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.LightGray)
-                    }
-                    IconButton(onClick = onOpenDownloads) {
-                        Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = "Downloads", tint = Color.LightGray)
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.LightGray)
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkBackground.copy(alpha = 0.95f),
-                    scrolledContainerColor = DarkBackground
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color(0xFF111111).copy(alpha = 0.9f)
                 )
             )
         },
-        containerColor = DarkBackground
+        bottomBar = {
+            NavigationBar(
+                containerColor = Color(0xFF2B2C30),
+                contentColor = Color.White,
+                modifier = Modifier.height(70.dp),
+                tonalElevation = 0.dp
+            ) {
+                val colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = com.hutube.app.ui.theme.BrandRed,
+                    unselectedIconColor = Color(0xFFB0B0B0),
+                    indicatorColor = Color.Transparent
+                )
+
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                    selected = true,
+                    onClick = { },
+                    colors = colors
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                    selected = false,
+                    onClick = onOpenSearch,
+                    colors = colors
+                )
+                NavigationBarItem(
+                    icon = { Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                    selected = false,
+                    onClick = onOpenDownloads,
+                    colors = colors
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                    selected = false,
+                    onClick = onOpenSettings,
+                    colors = colors
+                )
+            }
+        },
+        containerColor = Color(0xFF111111)
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -267,20 +297,21 @@ fun ContinueWatchingCard(
                 }
             }
 
-            // Progress Bar
+            // Circular Progress Overlay
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .background(Color.DarkGray)
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(item.progressPercent)
-                        .background(BrandRed)
+                CircularProgressIndicator(
+                    progress = { item.progressPercent },
+                    color = com.hutube.app.ui.theme.BrandRed,
+                    trackColor = Color.White.copy(alpha = 0.2f),
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(48.dp)
                 )
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
             }
         }
 

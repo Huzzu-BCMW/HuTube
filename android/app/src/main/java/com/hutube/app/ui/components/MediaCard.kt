@@ -55,23 +55,20 @@ fun MediaCard(
 
     Column(
         modifier = modifier
-            .width(140.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(CardBackground)
+            .width(114.dp)
+            .height(180.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF2B2C30))
             .border(
-                width = if (isFocused) 3.dp else 0.dp,
+                width = if (isFocused) 2.dp else 0.dp,
                 color = if (isFocused) Color.White else Color.Transparent,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(10.dp)
             )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable { onClick() }
     ) {
-        // Thumbnail Box (16:9)
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .background(Color.Black)
+            modifier = Modifier.fillMaxSize()
         ) {
             if (!thumbUrl.isNullOrEmpty()) {
                 AsyncImage(
@@ -100,13 +97,39 @@ fun MediaCard(
                 }
             }
 
-            // Quality Badge (e.g. 1080p, 4K)
+            // Bottom Shadow Scrim
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))
+                        )
+                    )
+            )
+
+            // Title
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            )
+
+            // Quality Badge
             if (badge != null) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
+                        .align(Alignment.TopStart)
                         .padding(4.dp)
-                        .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(4.dp))
+                        .background(com.hutube.app.ui.theme.BrandRed, RoundedCornerShape(4.dp))
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Text(
@@ -135,29 +158,6 @@ fun MediaCard(
                     )
                 }
             }
-        }
-
-        // Title and Info
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
-        ) {
-            Text(
-                text = title,
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                color = Color.Gray,
-                fontSize = 10.sp,
-                maxLines = 1
-            )
         }
     }
 }
