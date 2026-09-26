@@ -60,74 +60,90 @@ class DriveRepository(private val driveService: GoogleDriveService) {
             val news = mutableListOf<MediaItem>()
             val allVideos = mutableListOf<MediaItem>()
 
-            // Scan Movies
-            for (mFolder in movieFolders) {
-                val children = driveService.listFolderChildren(mFolder.id)
-                for (file in children) {
-                    if (driveService.isVideo(file)) {
-                        val mItem = toMediaItem(file, Category.MOVIES)
-                        movies.add(mItem)
-                        allVideos.add(mItem)
-                    } else if (file.isFolder) {
-                        // Movie in subfolder
-                        val subFiles = driveService.listFolderChildren(file.id)
-                        val video = subFiles.firstOrNull { driveService.isVideo(it) }
-                        if (video != null) {
-                            val mItem = toMediaItem(video, Category.MOVIES, titleOverride = file.name)
-                            movies.add(mItem)
-                            allVideos.add(mItem)
+            kotlinx.coroutines.coroutineScope {
+                val movieJobs = movieFolders.map { mFolder ->
+                    kotlinx.coroutines.async {
+                        val mFolderVideos = mutableListOf<MediaItem>()
+                        val children = driveService.listFolderChildren(mFolder.id)
+                        for (file in children) {
+                            if (driveService.isVideo(file)) {
+                                mFolderVideos.add(toMediaItem(file, Category.MOVIES))
+                            } else if (file.isFolder) {
+                                val subFiles = driveService.listFolderChildren(file.id)
+                                val video = subFiles.firstOrNull { driveService.isVideo(it) }
+                                if (video != null) {
+                                    mFolderVideos.add(toMediaItem(video, Category.MOVIES, titleOverride = file.name))
+                                }
+                            }
                         }
+                        mFolderVideos
                     }
                 }
-            }
 
-            // Scan Series
-            for (sFolder in seriesFolders) {
-                val shows = scanShowsInFolder(sFolder.id, Category.SERIES)
-                series.addAll(shows)
-                shows.forEach { allVideos.addAll(it.allEpisodes) }
-            }
-
-            // Scan Anime
-            for (aFolder in animeFolders) {
-                val shows = scanShowsInFolder(aFolder.id, Category.ANIME)
-                anime.addAll(shows)
-                shows.forEach { allVideos.addAll(it.allEpisodes) }
-
-                // Check for single standalone anime movies directly in folder
-                val children = driveService.listFolderChildren(aFolder.id)
-                val directVideos = children.filter { driveService.isVideo(it) }
-                for (v in directVideos) {
-                    val aItem = toMediaItem(v, Category.ANIME)
-                    anime.add(aItem)
-                    allVideos.add(aItem)
-                }
-            }
-
-            // Scan Cartoon
-            for (cFolder in cartoonFolders) {
-                val shows = scanShowsInFolder(cFolder.id, Category.CARTOON)
-                cartoon.addAll(shows)
-                shows.forEach { allVideos.addAll(it.allEpisodes) }
-
-                val children = driveService.listFolderChildren(cFolder.id)
-                val directVideos = children.filter { driveService.isVideo(it) }
-                for (v in directVideos) {
-                    val cItem = toMediaItem(v, Category.CARTOON)
-                    cartoon.add(cItem)
-                    allVideos.add(cItem)
-                }
-            }
-
-            // Scan Funny Breaking News
-            for (nFolder in newsFolders) {
-                val children = driveService.listFolderChildren(nFolder.id)
-                for (file in children) {
-                    if (driveService.isVideo(file)) {
-                        val nItem = toMediaItem(file, Category.NEWS)
-                        news.add(nItem)
-                        allVideos.add(nItem)
+                val seriesJobs = seriesFolders.map { kotlinx.coroutines.async { scanShowsInFolder(it.id, Category.SERIES) } }
+                val animeJobs = animeFolders.map { kotlinx.coroutines.async { scanShowsInFolder(it.id, Category.ANIME) } }
+                val cartoonJobs = cartoonFolders.map { kotlinx.coroutines.async { scanShowsInFolder(it.id, Category.CARTOON) } }
+                
+                val newsJobs = newsFolders.map { nFolder ->
+                    kotlinx.coroutines.async {
+                        val nFolderVideos = mutableListOf<MediaItem>()
+                        val children = driveService.listFolderChildren(nFolder.id)
+                        for (file in children) {
+                            if (driveService.isVideo(file)) {
+                                nFolderVideos.add(toMediaItem(file, Category.NEWS))
+                            }
+                        }
+                        nFolderVideos
                     }
+                }
+
+                movieJobs.awaitAll().forEach { mList ->
+                    movies.addAll(mList)
+                    allVideos.addAll(mList)
+                }
+
+                seriesJobs.awaitAll().forEach { sList ->
+                    series.addAll(sList)
+                    sList.forEach { allVideos.addAll(it.allEpisodes) }
+                }
+
+                animeJobs.awaitAll().forEach { aList ->
+                    anime.addAll(aList)
+                    aList.forEach { allVideos.addAll(it.allEpisodes) }
+                }
+                
+                // Anime single movies
+                val animeMovieJobs = animeFolders.map { aFolder ->
+                    kotlinx.coroutines.async {
+                        val children = driveService.listFolderChildren(aFolder.id)
+                        children.filter { driveService.isVideo(it) }.map { toMediaItem(it, Category.ANIME) }
+                    }
+                }
+                animeMovieJobs.awaitAll().forEach { aList ->
+                    anime.addAll(aList)
+                    allVideos.addAll(aList)
+                }
+
+                cartoonJobs.awaitAll().forEach { cList ->
+                    cartoon.addAll(cList)
+                    cList.forEach { allVideos.addAll(it.allEpisodes) }
+                }
+
+                // Cartoon single movies
+                val cartoonMovieJobs = cartoonFolders.map { cFolder ->
+                    kotlinx.coroutines.async {
+                        val children = driveService.listFolderChildren(cFolder.id)
+                        children.filter { driveService.isVideo(it) }.map { toMediaItem(it, Category.CARTOON) }
+                    }
+                }
+                cartoonMovieJobs.awaitAll().forEach { cList ->
+                    cartoon.addAll(cList)
+                    allVideos.addAll(cList)
+                }
+
+                newsJobs.awaitAll().forEach { nList ->
+                    news.addAll(nList)
+                    allVideos.addAll(nList)
                 }
             }
 
@@ -151,67 +167,67 @@ class DriveRepository(private val driveService: GoogleDriveService) {
         }
     }
 
-    private suspend fun scanShowsInFolder(parentFolderId: String, category: Category): List<ShowItem> {
-        val showItems = mutableListOf<ShowItem>()
+    private suspend fun scanShowsInFolder(parentFolderId: String, category: Category): List<ShowItem> = kotlinx.coroutines.coroutineScope {
         val showFolders = driveService.listFolderChildren(parentFolderId).filter { it.isFolder }
 
-        for (showFolder in showFolders) {
-            val showChildren = driveService.listFolderChildren(showFolder.id)
-            val directVideos = showChildren.filter { driveService.isVideo(it) }
-            val subFolders = showChildren.filter { it.isFolder }
+        val deferredShows = showFolders.map { showFolder ->
+            kotlinx.coroutines.async {
+                val showChildren = driveService.listFolderChildren(showFolder.id)
+                val directVideos = showChildren.filter { driveService.isVideo(it) }
+                val subFolders = showChildren.filter { it.isFolder }
 
-            val seasons = mutableListOf<SeasonItem>()
-            val directEpisodes = mutableListOf<MediaItem>()
+                val seasons = mutableListOf<SeasonItem>()
+                val directEpisodes = mutableListOf<MediaItem>()
 
-            // Recursive function to find all folders that contain videos
-            suspend fun findVideoFolders(folder: DriveFile): List<Pair<DriveFile, List<DriveFile>>> {
-                val result = mutableListOf<Pair<DriveFile, List<DriveFile>>>()
-                val children = driveService.listFolderChildren(folder.id)
-                val videos = children.filter { driveService.isVideo(it) }
-                if (videos.isNotEmpty()) {
-                    result.add(Pair(folder, videos))
+                // Recursive function to find all folders that contain videos
+                suspend fun findVideoFolders(folder: DriveFile): List<Pair<DriveFile, List<DriveFile>>> {
+                    val result = mutableListOf<Pair<DriveFile, List<DriveFile>>>()
+                    val children = driveService.listFolderChildren(folder.id)
+                    val videos = children.filter { driveService.isVideo(it) }
+                    if (videos.isNotEmpty()) {
+                        result.add(Pair(folder, videos))
+                    }
+                    val subs = children.filter { it.isFolder }
+                    
+                    val subResults = subs.map { sub -> kotlinx.coroutines.async { findVideoFolders(sub) } }.awaitAll()
+                    subResults.forEach { result.addAll(it) }
+                    
+                    return result
                 }
-                val subs = children.filter { it.isFolder }
-                for (sub in subs) {
-                    result.addAll(findVideoFolders(sub))
-                }
-                return result
-            }
 
-            var seasonIndex = 1
-            for (sub in subFolders) {
-                val videoFolders = findVideoFolders(sub)
-                for ((seasonFolder, videos) in videoFolders) {
-                    val seasonEpisodes = videos.map {
+                var seasonIndex = 1
+                val subFolderVideoFolders = subFolders.map { sub -> kotlinx.coroutines.async { findVideoFolders(sub) } }.awaitAll()
+                for (videoFolders in subFolderVideoFolders) {
+                    for ((seasonFolder, videos) in videoFolders) {
+                        val seasonEpisodes = videos.map {
+                            val (sNum, epNum) = driveService.parseEpisodeInfo(it.name)
+                            toMediaItem(it, category, showFolder.name, sNum, epNum)
+                        }.sortedBy { it.episode ?: 0 }
+
+                        seasons.add(
+                            SeasonItem(
+                                id = seasonFolder.id,
+                                name = seasonFolder.name,
+                                seasonNumber = seasonIndex++,
+                                episodes = seasonEpisodes
+                            )
+                        )
+                    }
+                }
+
+                // Direct episodes
+                directEpisodes.addAll(
+                    directVideos.map {
                         val (sNum, epNum) = driveService.parseEpisodeInfo(it.name)
                         toMediaItem(it, category, showFolder.name, sNum, epNum)
                     }.sortedBy { it.episode ?: 0 }
+                )
+                
+                if (seasons.isEmpty() && directEpisodes.isEmpty()) return@async null
 
-                    seasons.add(
-                        SeasonItem(
-                            id = seasonFolder.id,
-                            name = seasonFolder.name, // Will be "Season 1", "Movies", etc.
-                            seasonNumber = seasonIndex++,
-                            episodes = seasonEpisodes
-                        )
-                    )
-                }
-            }
+                val firstThumb = seasons.firstOrNull()?.episodes?.firstOrNull()?.thumbnailLink
+                    ?: directEpisodes.firstOrNull()?.thumbnailLink
 
-            // Direct episodes
-            directEpisodes.addAll(
-                directVideos.map {
-                    val (sNum, epNum) = driveService.parseEpisodeInfo(it.name)
-                    toMediaItem(it, category, showFolder.name, sNum, epNum)
-                }.sortedBy { it.episode ?: 0 }
-            )
-            
-            if (seasons.isEmpty() && directEpisodes.isEmpty()) continue
-
-            val firstThumb = seasons.firstOrNull()?.episodes?.firstOrNull()?.thumbnailLink
-                ?: directEpisodes.firstOrNull()?.thumbnailLink
-
-            showItems.add(
                 ShowItem(
                     id = showFolder.id,
                     title = driveService.cleanTitle(showFolder.name),
@@ -220,10 +236,10 @@ class DriveRepository(private val driveService: GoogleDriveService) {
                     seasons = seasons,
                     episodes = directEpisodes
                 )
-            )
+            }
         }
 
-        return showItems
+        deferredShows.awaitAll().filterNotNull()
     }
 
     private fun toMediaItem(
