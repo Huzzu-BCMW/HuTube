@@ -261,7 +261,7 @@ fun SeriesDetailScreen(
                     
                     // Download Button
                     IconButton(onClick = { onDownload(episode) }) {
-                        Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = "Download", tint = Color.LightGray)
+                        Icon(Icons.Default.Download, contentDescription = "Download", tint = Color.LightGray)
                     }
                 }
             }

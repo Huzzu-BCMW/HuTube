@@ -1,4 +1,4 @@
-﻿package com.hutube.app.data.drive
+package com.hutube.app.data.drive
 
 import android.util.Log
 import com.hutube.app.data.model.Category
@@ -153,12 +153,12 @@ class DriveRepository(private val driveService: GoogleDriveService) {
             Log.d(TAG, "=== Scan complete: anime=${anime.size}, cartoon=${cartoon.size}, series=${series.size}, movies=${movies.size}, news=${news.size}, total=${allVideos.size} ===")
 
             _catalog.value = CatalogData(
-                anime = anime,
-                cartoon = cartoon,
-                series = series,
-                movies = movies,
-                news = news,
-                allVideos = allVideos,
+                anime = anime.sortedBy { if (it is ShowItem) it.title else (it as MediaItem).title },
+                cartoon = cartoon.sortedBy { if (it is ShowItem) it.title else (it as MediaItem).title },
+                series = series.sortedBy { it.title },
+                movies = movies.sortedBy { it.title },
+                news = news.sortedBy { it.title },
+                allVideos = allVideos.sortedBy { it.title },
                 isScanning = false,
                 error = null
             )

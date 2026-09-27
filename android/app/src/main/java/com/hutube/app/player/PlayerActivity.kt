@@ -3,14 +3,12 @@ package com.hutube.app.player
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Rational
-import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
@@ -21,23 +19,27 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.focusable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.key
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +54,8 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.hutube.app.HuTubeApplication
 import com.hutube.app.data.model.MediaItem
+import com.hutube.app.ui.theme.BrandRed
+import com.hutube.app.ui.theme.CardBackground
 import kotlinx.coroutines.delay
 import java.io.Serializable
 
@@ -105,7 +109,6 @@ class PlayerActivity : ComponentActivity() {
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
                     if (state == Player.STATE_ENDED && nextMedia != null) {
-                        // Play next episode
                         val intent = Intent(this@PlayerActivity, PlayerActivity::class.java).apply {
                             putExtra(EXTRA_MEDIA, nextMedia)
                             putExtra(EXTRA_TOKEN, accessToken)
@@ -127,7 +130,6 @@ class PlayerActivity : ComponentActivity() {
         }
         player?.prepare()
 
-        // Restore saved position
         val savedPos = HuTubeApplication.instance.watchHistoryManager.getProgress(currentMedia.id)
         if (savedPos > 10000) {
             player?.seekTo(savedPos)
@@ -232,6 +234,7 @@ fun PlayerScreen(
     var duration by remember { mutableLongStateOf(0L) }
     var resizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
 
+    // Poll player state
     LaunchedEffect(player) {
         while (true) {
             player?.let {
@@ -243,6 +246,7 @@ fun PlayerScreen(
         }
     }
 
+    // Auto-hide controls after 5 seconds
     LaunchedEffect(showControls, isPlaying) {
         if (showControls && isPlaying) {
             delay(5000)
@@ -250,7 +254,7 @@ fun PlayerScreen(
         }
     }
 
-    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     Box(
@@ -259,20 +263,24 @@ fun PlayerScreen(
             .background(Color.Black)
             .focusRequester(focusRequester)
             .onKeyEvent { event ->
-                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyUp) {
+                if (event.type == KeyEventType.KeyUp) {
                     when (event.key) {
-                        androidx.compose.ui.input.key.Key.DirectionLeft -> {
+                        Key.DirectionLeft -> {
                             player?.seekTo((player.currentPosition - 10000).coerceAtLeast(0L))
                             showControls = true
                             true
                         }
-                        androidx.compose.ui.input.key.Key.DirectionRight -> {
-                            player?.seekTo((player.currentPosition + 10000).coerceAtMost(player?.duration ?: 0L))
+                        Key.DirectionRight -> {
+                            player?.seekTo((player.currentPosition + 10000).coerceAtMost(player.duration))
                             showControls = true
                             true
                         }
-                        androidx.compose.ui.input.key.Key.DirectionCenter, androidx.compose.ui.input.key.Key.Enter -> {
+                        Key.DirectionCenter, Key.Enter -> {
                             showControls = !showControls
+                            true
+                        }
+                        Key.MediaPlayPause -> {
+                            player?.let { if (it.isPlaying) it.pause() else it.play() }
                             true
                         }
                         else -> false
@@ -317,33 +325,34 @@ fun PlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.55f))
+                    .background(Color.Black.copy(alpha = 0.5f))
             ) {
-                // Gradients for Top and Bottom to make text readable
+                // Top gradient
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp)
                         .align(Alignment.TopCenter)
                         .background(
-                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                            Brush.verticalGradient(
                                 colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent)
                             )
                         )
                 )
+                // Bottom gradient
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(180.dp)
                         .align(Alignment.BottomCenter)
                         .background(
-                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                            Brush.verticalGradient(
                                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))
                             )
                         )
                 )
 
-                // Top Bar
+                // Top Bar — Title and actions
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -352,21 +361,22 @@ fun PlayerScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(28.dp))
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
                                 text = media.title,
                                 color = Color.White,
                                 fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
                             )
                             media.seriesTitle?.let {
                                 Text(
-                                    text = "$it Â· Episode ${media.episode ?: 1}",
+                                    text = "$it · Episode ${media.episode ?: 1}",
                                     color = Color.LightGray,
                                     fontSize = 14.sp
                                 )
@@ -374,8 +384,8 @@ fun PlayerScreen(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        // Skip Intro (+85s) - Cloudstream style pill
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Skip Opening pill
                         Button(
                             onClick = {
                                 player?.seekTo((player.currentPosition + 85000).coerceAtMost(player.duration))
@@ -385,26 +395,6 @@ fun PlayerScreen(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Text("Skip Opening", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        // Subtitle Button
-                        var showSubtitleDialog by remember { mutableStateOf(false) }
-                        IconButton(onClick = { showSubtitleDialog = true }) {
-                            Icon(androidx.compose.material.icons.Icons.Default.Subtitles, contentDescription = "Subtitles", tint = Color.White)
-                        }
-
-                        if (showSubtitleDialog) {
-                            AlertDialog(
-                                onDismissRequest = { showSubtitleDialog = false },
-                                title = { Text("Subtitles") },
-                                text = { Text("Subtitle track selection is handled automatically by ExoPlayer if embedded. Cloudstream-style track selection UI coming soon.") },
-                                confirmButton = {
-                                    TextButton(onClick = { showSubtitleDialog = false }) { Text("OK", color = com.hutube.app.ui.theme.BrandRed) }
-                                },
-                                containerColor = com.hutube.app.ui.theme.CardBackground,
-                                titleContentColor = Color.White,
-                                textContentColor = Color.LightGray
-                            )
                         }
 
                         // Aspect Ratio Toggle
@@ -429,22 +419,22 @@ fun PlayerScreen(
                 Row(
                     modifier = Modifier.align(Alignment.Center),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(64.dp)
+                    horizontalArrangement = Arrangement.spacedBy(56.dp)
                 ) {
                     // Rewind 10s
                     IconButton(
                         onClick = { player?.seekTo((player.currentPosition - 10000).coerceAtLeast(0L)) },
-                        modifier = Modifier.size(72.dp)
+                        modifier = Modifier.size(64.dp)
                     ) {
-                        Icon(Icons.Default.Replay10, contentDescription = "Rewind 10s", tint = Color.White, modifier = Modifier.size(48.dp))
+                        Icon(Icons.Default.Replay10, contentDescription = "Rewind 10s", tint = Color.White, modifier = Modifier.size(44.dp))
                     }
 
-                    // Play / Pause (Circular borderless ripple)
+                    // Play / Pause
                     Box(
                         modifier = Modifier
-                            .size(88.dp)
-                            .clip(androidx.compose.foundation.shape.CircleShape)
-                            .background(Color.White.copy(alpha = 0.1f))
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.15f))
                             .clickable {
                                 player?.let {
                                     if (it.isPlaying) it.pause() else it.play()
@@ -456,26 +446,40 @@ fun PlayerScreen(
                             if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
                             tint = Color.White,
-                            modifier = Modifier.size(56.dp)
+                            modifier = Modifier.size(52.dp)
                         )
                     }
 
                     // Forward 10s
                     IconButton(
                         onClick = { player?.seekTo((player.currentPosition + 10000).coerceAtMost(player.duration)) },
-                        modifier = Modifier.size(72.dp)
+                        modifier = Modifier.size(64.dp)
                     ) {
-                        Icon(Icons.Default.Forward10, contentDescription = "Forward 10s", tint = Color.White, modifier = Modifier.size(48.dp))
+                        Icon(Icons.Default.Forward10, contentDescription = "Forward 10s", tint = Color.White, modifier = Modifier.size(44.dp))
                     }
                 }
 
-                // Bottom Controls & Scrubber (Cloudstream Thin Style)
+                // Bottom Controls & Scrubber
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 24.dp)
+                        .padding(horizontal = 24.dp, vertical = 20.dp)
                         .align(Alignment.BottomCenter)
                 ) {
+                    // Scrubber
+                    Slider(
+                        value = if (duration > 0) currentPos.toFloat() / duration.toFloat() else 0f,
+                        onValueChange = { percent ->
+                            player?.seekTo((percent * duration).toLong())
+                        },
+                        colors = SliderDefaults.colors(
+                            thumbColor = BrandRed,
+                            activeTrackColor = BrandRed,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(24.dp)
+                    )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -484,7 +488,7 @@ fun PlayerScreen(
                         Text(
                             text = formatTime(currentPos),
                             color = Color.White,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
 
@@ -492,30 +496,17 @@ fun PlayerScreen(
                             TextButton(onClick = { onPlayNext(nextMedia) }) {
                                 Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Next Episode", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text("Next Episode", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
                         Text(
                             text = formatTime(duration),
                             color = Color.White,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
-
-                    Slider(
-                        value = if (duration > 0) currentPos.toFloat() / duration.toFloat() else 0f,
-                        onValueChange = { percent ->
-                            player?.seekTo((percent * duration).toLong())
-                        },
-                        colors = SliderDefaults.colors(
-                            thumbColor = com.hutube.app.ui.theme.BrandRed,
-                            activeTrackColor = com.hutube.app.ui.theme.BrandRed,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.fillMaxWidth().height(24.dp)
-                    )
                 }
             }
         }
@@ -533,7 +524,3 @@ private fun formatTime(millis: Long): String {
         String.format("%02d:%02d", minutes, seconds)
     }
 }
-
-
-
-

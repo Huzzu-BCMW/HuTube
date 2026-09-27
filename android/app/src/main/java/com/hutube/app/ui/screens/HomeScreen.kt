@@ -114,7 +114,7 @@ fun HomeScreen(
                     colors = colors
                 )
                 NavigationBarItem(
-                    icon = { Icon(androidx.compose.material.icons.Icons.Default.Download, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                    icon = { Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(28.dp)) },
                     selected = false,
                     onClick = onOpenDownloads,
                     colors = colors

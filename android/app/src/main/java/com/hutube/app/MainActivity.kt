@@ -1,9 +1,10 @@
-﻿package com.hutube.app
+package com.hutube.app
 
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import com.hutube.app.data.drive.DriveRepository
 import com.hutube.app.data.drive.GoogleDriveService
 import com.hutube.app.data.drive.OAuthManager
+import com.hutube.app.data.model.MediaItem
 import com.hutube.app.data.model.ShowItem
 import com.hutube.app.player.PlayerActivity
 import com.hutube.app.ui.screens.HomeScreen
@@ -47,8 +49,6 @@ class MainActivity : ComponentActivity() {
 
         oauthManager = OAuthManager(this)
 
-        // The token provider calls getValidToken() to always get a fresh token
-        // (refreshes automatically if expired)
         driveService = GoogleDriveService {
             kotlinx.coroutines.runBlocking {
                 try {
@@ -60,52 +60,44 @@ class MainActivity : ComponentActivity() {
         }
         driveRepository = DriveRepository(driveService)
 
-        // Check what credentials we have baked in
         val hasClientId = BuildConfig.DEFAULT_CLIENT_ID.isNotEmpty()
         val hasClientSecret = BuildConfig.DEFAULT_CLIENT_SECRET.isNotEmpty()
         val hasRefreshToken = BuildConfig.DEFAULT_REFRESH_TOKEN.isNotEmpty()
-        debugInfo = "ClientID: ${if (hasClientId) "âœ…" else "âŒ"} | Secret: ${if (hasClientSecret) "âœ…" else "âŒ"} | RefreshToken: ${if (hasRefreshToken) "âœ…" else "âŒ"}"
+        debugInfo = "ClientID: ${if (hasClientId) "✅" else "❌"} | Secret: ${if (hasClientSecret) "✅" else "❌"} | RefreshToken: ${if (hasRefreshToken) "✅" else "❌"}"
         Log.d("MainActivity", "Credentials check: $debugInfo")
 
-        // Silently authenticate on startup â€” ZERO login UI
         lifecycleScope.launch {
             try {
                 Log.d("MainActivity", "Starting silent authentication...")
-                debugInfo += "\nâ³ Refreshing token..."
 
                 val token = oauthManager.silentSignIn()
 
                 if (token != null) {
                     accessToken = token
-                    debugInfo += "\nâœ… Token: ${token.take(15)}..."
+                    // Feed token to Coil so thumbnails load with auth
+                    HuTubeApplication.instance.currentAccessToken = token
                     Log.d("MainActivity", "Silent auth successful, scanning Drive...")
 
-                    debugInfo += "\nâ³ Scanning Google Drive..."
                     driveRepository.scanDrive()
 
                     val catalog = driveRepository.catalog.value
                     val totalItems = catalog.anime.size + catalog.cartoon.size + catalog.series.size + catalog.movies.size + catalog.news.size
-                    debugInfo += "\nðŸ“Š anime=${catalog.anime.size} cartoon=${catalog.cartoon.size} series=${catalog.series.size} movies=${catalog.movies.size} news=${catalog.news.size}"
 
                     if (catalog.error != null) {
-                        debugInfo += "\nâŒ Scan error: ${catalog.error}"
-                        errorMessage = "Scan Failed:\n$debugInfo"
+                        errorMessage = "Scan Failed:\n${catalog.error}"
                     } else if (totalItems == 0) {
-                        debugInfo += "\nâš ï¸ 0 items found. Check: Is Google Drive API enabled? Do you have folders named Anime/Cartoon/Series/Movies/News?"
-                        errorMessage = "No matching folders found.\n\n$debugInfo"
+                        errorMessage = "No matching folders found.\n\nMake sure you have folders named Anime, Cartoon, Series, Movies, or News in your Google Drive."
                     }
 
                     isLoading = false
                 } else {
-                    Log.e("MainActivity", "Silent auth failed â€” no token returned")
-                    debugInfo += "\nâŒ Token refresh returned null!"
-                    errorMessage = "Authentication failed.\n\n$debugInfo"
+                    Log.e("MainActivity", "Silent auth failed")
+                    errorMessage = "Authentication failed. Check your credentials."
                     isLoading = false
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Auth exception: ${e.message}", e)
-                debugInfo += "\nâŒ Exception: ${e.message}"
-                errorMessage = "Error: ${e.message}\n\n$debugInfo"
+                errorMessage = "Error: ${e.message}"
                 isLoading = false
             }
         }
@@ -115,14 +107,22 @@ class MainActivity : ComponentActivity() {
                 val catalog by driveRepository.catalog.collectAsState()
                 var selectedShow by remember { mutableStateOf<ShowItem?>(null) }
                 var showDownloads by remember { mutableStateOf(false) }
+                var showSearch by remember { mutableStateOf(false) }
+
+                // Handle back button properly
+                BackHandler(enabled = selectedShow != null || showDownloads || showSearch) {
+                    when {
+                        selectedShow != null -> selectedShow = null
+                        showDownloads -> showDownloads = false
+                        showSearch -> showSearch = false
+                    }
+                }
 
                 when {
-                    // Loading splash while authenticating silently
                     isLoading -> {
-                        SplashScreen(debugInfo)
+                        SplashScreen()
                     }
 
-                    // Error state â€” credentials are missing or broken
                     errorMessage != null -> {
                         ErrorScreen(message = errorMessage!!)
                     }
@@ -130,7 +130,7 @@ class MainActivity : ComponentActivity() {
                     showDownloads -> {
                         val downloader = remember { com.hutube.app.data.download.DownloadManagerHelper(this@MainActivity) }
                         val files = downloader.getDownloadedFiles()
-                        
+
                         com.hutube.app.ui.screens.DownloadsScreen(
                             files = files,
                             onBack = { showDownloads = false },
@@ -141,11 +141,35 @@ class MainActivity : ComponentActivity() {
                                     nextMedia = null,
                                     token = accessToken ?: ""
                                 )
+                            },
+                            onDelete = { file ->
+                                file.delete()
+                                // Force recompose by toggling
+                                showDownloads = false
+                                showDownloads = true
                             }
                         )
                     }
 
-                    // Series detail view
+                    showSearch -> {
+                        com.hutube.app.ui.screens.SearchScreen(
+                            allItems = catalog.allVideos + catalog.series.flatMap { listOf(it as Any) } + catalog.anime + catalog.cartoon,
+                            onBack = { showSearch = false },
+                            onPlayMedia = { media ->
+                                PlayerActivity.start(
+                                    context = this@MainActivity,
+                                    media = media,
+                                    nextMedia = null,
+                                    token = accessToken ?: ""
+                                )
+                            },
+                            onOpenShow = { show ->
+                                showSearch = false
+                                selectedShow = show
+                            }
+                        )
+                    }
+
                     selectedShow != null -> {
                         SeriesDetailScreen(
                             show = selectedShow!!,
@@ -161,11 +185,11 @@ class MainActivity : ComponentActivity() {
                             onDownload = { media ->
                                 val downloader = com.hutube.app.data.download.DownloadManagerHelper(this)
                                 downloader.startDownload(media, accessToken ?: "")
+                                Toast.makeText(this, "Downloading: ${media.title}", Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
 
-                    // Main home screen â€” the default landing page
                     else -> {
                         HomeScreen(
                             catalog = catalog,
@@ -173,6 +197,7 @@ class MainActivity : ComponentActivity() {
                                 lifecycleScope.launch {
                                     val validToken = oauthManager.getValidToken()
                                     accessToken = validToken
+                                    HuTubeApplication.instance.currentAccessToken = validToken
                                     driveRepository.scanDrive()
                                 }
                             },
@@ -188,17 +213,14 @@ class MainActivity : ComponentActivity() {
                                 selectedShow = show
                             },
                             onOpenDownloads = { showDownloads = true },
-                            onOpenSearch = {
-                                // Show debug info as toast for diagnostics
-                                Toast.makeText(this, debugInfo, Toast.LENGTH_LONG).show()
-                            },
+                            onOpenSearch = { showSearch = true },
                             onOpenSettings = {
-                                // Sign Out
-                                oauthManager.clear()
-                                accessToken = null
-                                isLoading = false
-                                errorMessage = "Signed out. Re-install APK with fresh credentials to reconnect."
-                                Toast.makeText(this, "Disconnected Google Drive", Toast.LENGTH_SHORT).show()
+                                // Show app info toast — NOT a logout
+                                Toast.makeText(
+                                    this,
+                                    "HuTube v${BuildConfig.VERSION_NAME}\nItems loaded: ${catalog.allVideos.size} videos",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         )
                     }
@@ -209,10 +231,10 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Splash screen with debug info visible so user can screenshot if it gets stuck.
+ * Clean splash screen — just logo and spinner, no debug spam.
  */
 @Composable
-private fun SplashScreen(debugInfo: String = "") {
+private fun SplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -221,42 +243,31 @@ private fun SplashScreen(debugInfo: String = "") {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row {
-                Text("Hu", color = Color.White, fontWeight = FontWeight.Black, fontSize = 42.sp)
-                Text("Tube", color = BrandRed, fontWeight = FontWeight.Black, fontSize = 42.sp)
+                Text("Hu", color = Color.White, fontWeight = FontWeight.Black, fontSize = 48.sp)
+                Text("Tube", color = BrandRed, fontWeight = FontWeight.Black, fontSize = 48.sp)
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             CircularProgressIndicator(
                 color = BrandRed,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(36.dp),
                 strokeWidth = 3.dp
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Connecting to Google Drive...",
+                text = "Loading your library...",
                 color = Color.Gray,
                 fontSize = 14.sp
             )
-
-            if (debugInfo.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    text = debugInfo,
-                    color = Color.DarkGray,
-                    fontSize = 10.sp,
-                    lineHeight = 14.sp,
-                    modifier = Modifier.padding(horizontal = 32.dp)
-                )
-            }
         }
     }
 }
 
 /**
- * Error screen with full debug details so user can screenshot for diagnosis.
+ * Error screen with details.
  */
 @Composable
 private fun ErrorScreen(message: String) {
@@ -279,7 +290,7 @@ private fun ErrorScreen(message: String) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "âš ï¸ Configuration Error",
+                text = "⚠️ Something went wrong",
                 color = Color(0xFFFF6B6B),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
@@ -297,7 +308,3 @@ private fun ErrorScreen(message: String) {
         }
     }
 }
-
-
-
-
