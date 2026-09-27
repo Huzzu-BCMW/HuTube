@@ -17,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,8 +32,6 @@ import com.hutube.app.data.model.Category
 import com.hutube.app.data.model.MediaItem
 import com.hutube.app.data.model.ShowItem
 import com.hutube.app.data.model.WatchProgress
-import com.hutube.app.ui.components.CategoryRow
-import com.hutube.app.ui.components.HeroBanner
 import com.hutube.app.ui.theme.BrandRed
 import com.hutube.app.ui.theme.CardBackground
 import com.hutube.app.ui.theme.DarkBackground
@@ -41,151 +41,153 @@ import com.hutube.app.ui.theme.DarkBackground
 fun HomeScreen(
     catalog: CatalogData,
     onRefresh: () -> Unit,
-    onPlayMedia: (MediaItem, MediaItem?) -> Unit, // media, nextMedia
+    onPlayMedia: (MediaItem, MediaItem?) -> Unit,
     onOpenShow: (ShowItem) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     val history = remember { mutableStateOf(HuTubeApplication.instance.watchHistoryManager.getHistory()) }
+    var selectedNav by remember { mutableIntStateOf(0) }
 
-    // Pick featured item (Movie, Series, or Anime)
-    val featuredItem = catalog.movies.firstOrNull()
-        ?: catalog.series.firstOrNull()
+    // Pick a featured item — prefer a show with a thumbnail
+    val featuredItem = catalog.anime.firstOrNull { it is ShowItem && !(it as ShowItem).thumbnailLink.isNullOrEmpty() }
+        ?: catalog.series.firstOrNull { !it.thumbnailLink.isNullOrEmpty() }
+        ?: catalog.movies.firstOrNull { !it.thumbnailLink.isNullOrEmpty() }
         ?: catalog.anime.firstOrNull()
+        ?: catalog.series.firstOrNull()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = BrandRed,
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Hu", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        Text("Tube", color = BrandRed, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        if (catalog.isScanning) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandRed, strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.LightGray)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color(0xFF111111).copy(alpha = 0.9f)
-                )
-            )
-        },
         bottomBar = {
             NavigationBar(
-                containerColor = Color(0xFF2B2C30),
+                containerColor = Color(0xFF0F0F0F),
                 contentColor = Color.White,
-                modifier = Modifier.height(70.dp),
+                modifier = Modifier.height(64.dp),
                 tonalElevation = 0.dp
             ) {
                 val colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = com.hutube.app.ui.theme.BrandRed,
-                    unselectedIconColor = Color(0xFFB0B0B0),
+                    selectedIconColor = BrandRed,
+                    unselectedIconColor = Color(0xFF808080),
                     indicatorColor = Color.Transparent
                 )
-
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(28.dp)) },
-                    selected = true,
-                    onClick = { },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(26.dp)) },
+                    label = { Text("Home", fontSize = 10.sp) },
+                    selected = selectedNav == 0,
+                    onClick = { selectedNav = 0 },
                     colors = colors
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                    icon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(26.dp)) },
+                    label = { Text("Search", fontSize = 10.sp) },
                     selected = false,
                     onClick = onOpenSearch,
                     colors = colors
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                    icon = { Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(26.dp)) },
+                    label = { Text("Downloads", fontSize = 10.sp) },
                     selected = false,
                     onClick = onOpenDownloads,
                     colors = colors
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(26.dp)) },
+                    label = { Text("Settings", fontSize = 10.sp) },
                     selected = false,
                     onClick = onOpenSettings,
                     colors = colors
                 )
             }
         },
-        containerColor = Color(0xFF111111)
+        containerColor = Color(0xFF0b0b0b)
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Hero Featured Banner
-            if (featuredItem != null) {
-                item {
-                    HeroBanner(
-                        item = featuredItem,
-                        onPlay = {
-                            if (featuredItem is ShowItem) {
+            // === HERO BANNER ===
+            item {
+                HeroSection(
+                    item = featuredItem,
+                    isScanning = catalog.isScanning,
+                    onRefresh = onRefresh,
+                    onPlay = {
+                        when (featuredItem) {
+                            is ShowItem -> {
                                 val firstEp = featuredItem.allEpisodes.firstOrNull()
                                 val nextEp = featuredItem.allEpisodes.getOrNull(1)
                                 if (firstEp != null) onPlayMedia(firstEp, nextEp)
-                            } else if (featuredItem is MediaItem) {
-                                onPlayMedia(featuredItem, null)
                             }
-                        },
-                        onDetails = {
-                            if (featuredItem is ShowItem) onOpenShow(featuredItem)
+                            is MediaItem -> onPlayMedia(featuredItem, null)
                         }
-                    )
+                    },
+                    onInfo = {
+                        if (featuredItem is ShowItem) onOpenShow(featuredItem)
+                    }
+                )
+            }
+
+            // === CONTINUE WATCHING ===
+            if (history.value.isNotEmpty()) {
+                item {
+                    SectionHeader(title = "Continue Watching", icon = "▶")
+                }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(history.value.take(10)) { item ->
+                            ContinueWatchingCard(
+                                item = item,
+                                onClick = {
+                                    val media = MediaItem(
+                                        id = item.fileId,
+                                        name = item.title,
+                                        title = item.title,
+                                        seriesTitle = item.seriesTitle,
+                                        season = item.season,
+                                        episode = item.episode,
+                                        thumbnailLink = item.thumbnailLink,
+                                        durationMillis = item.durationMs
+                                    )
+                                    onPlayMedia(media, null)
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
-            // Continue Watching Shelf
-            if (history.value.isNotEmpty()) {
-                item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                        Text(
-                            text = "🕒  Continue Watching",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                        )
+            // === CATEGORY ROWS ===
+            val categories = listOf(
+                Triple(Category.ANIME, catalog.anime, "anime"),
+                Triple(Category.CARTOON, catalog.cartoon, "cartoon"),
+                Triple(Category.SERIES, catalog.series.map { it as Any }, "series"),
+                Triple(Category.MOVIES, catalog.movies.map { it as Any }, "movies"),
+                Triple(Category.NEWS, catalog.news.map { it as Any }, "news")
+            )
 
+            for ((category, items, _) in categories) {
+                if (items.isNotEmpty()) {
+                    item {
+                        SectionHeader(title = category.title, icon = category.icon, count = items.size)
+                    }
+                    item {
                         LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(history.value) { item ->
-                                ContinueWatchingCard(
+                            items(items) { item ->
+                                PosterCard(
                                     item = item,
                                     onClick = {
-                                        val media = MediaItem(
-                                            id = item.fileId,
-                                            name = item.title,
-                                            title = item.title,
-                                            seriesTitle = item.seriesTitle,
-                                            season = item.season,
-                                            episode = item.episode,
-                                            thumbnailLink = item.thumbnailLink,
-                                            durationMillis = item.durationMs
-                                        )
-                                        onPlayMedia(media, null)
+                                        when (item) {
+                                            is ShowItem -> onOpenShow(item)
+                                            is MediaItem -> onPlayMedia(item, null)
+                                        }
                                     }
                                 )
                             }
@@ -194,81 +196,358 @@ fun HomeScreen(
                 }
             }
 
-            // 5 Category Rows
-            item {
-                CategoryRow(
-                    category = Category.ANIME,
-                    items = catalog.anime,
-                    onItemClick = { item ->
-                        if (item is ShowItem) onOpenShow(item)
-                        else if (item is MediaItem) onPlayMedia(item, null)
-                    }
+            // Bottom spacing
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+        }
+    }
+}
+
+// ===== HERO SECTION =====
+@Composable
+private fun HeroSection(
+    item: Any?,
+    isScanning: Boolean,
+    onRefresh: () -> Unit,
+    onPlay: () -> Unit,
+    onInfo: () -> Unit
+) {
+    val isShow = item is ShowItem
+    val title = when (item) {
+        is ShowItem -> item.title
+        is MediaItem -> item.title
+        else -> ""
+    }
+    val thumbUrl = when (item) {
+        is ShowItem -> item.thumbnailLink
+        is MediaItem -> item.thumbnailLink
+        else -> null
+    }
+    val categoryName = when (item) {
+        is ShowItem -> item.category.title
+        is MediaItem -> item.category.title
+        else -> ""
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(420.dp)
+    ) {
+        // Background image
+        if (!thumbUrl.isNullOrEmpty()) {
+            AsyncImage(
+                model = thumbUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1a1a1a)))
+        }
+
+        // Top scrim
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(listOf(Color(0xFF0b0b0b), Color.Transparent))
                 )
+        )
+
+        // Bottom scrim
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(250.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color(0xFF0b0b0b).copy(alpha = 0.85f), Color(0xFF0b0b0b))
+                    )
+                )
+        )
+
+        // Top bar — Logo + refresh
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .align(Alignment.TopCenter),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("H", color = Color.White, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                Text("u", color = Color.White, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                Text("Tube", color = BrandRed, fontWeight = FontWeight.Black, fontSize = 22.sp)
             }
 
-            item {
-                CategoryRow(
-                    category = Category.CARTOON,
-                    items = catalog.cartoon,
-                    onItemClick = { item ->
-                        if (item is ShowItem) onOpenShow(item)
-                        else if (item is MediaItem) onPlayMedia(item, null)
-                    }
-                )
+            IconButton(onClick = onRefresh) {
+                if (isScanning) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BrandRed, strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White)
+                }
             }
+        }
 
-            item {
-                CategoryRow(
-                    category = Category.SERIES,
-                    items = catalog.series,
-                    onItemClick = { item ->
-                        if (item is ShowItem) onOpenShow(item)
-                    }
+        // Hero content
+        if (item != null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Category badge
+                Surface(
+                    color = BrandRed.copy(alpha = 0.9f),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = categoryName.uppercase(),
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 40.dp)
                 )
-            }
 
-            item {
-                CategoryRow(
-                    category = Category.MOVIES,
-                    items = catalog.movies,
-                    onItemClick = { item ->
-                        if (item is MediaItem) onPlayMedia(item, null)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Play button
+                    Button(
+                        onClick = onPlay,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Play", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
-                )
-            }
 
-            item {
-                CategoryRow(
-                    category = Category.NEWS,
-                    items = catalog.news,
-                    onItemClick = { item ->
-                        if (item is MediaItem) onPlayMedia(item, null)
+                    // Info button (for shows only)
+                    if (isShow) {
+                        OutlinedButton(
+                            onClick = onInfo,
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                brush = Brush.horizontalGradient(listOf(Color.Gray, Color.Gray))
+                            )
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Info", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
                     }
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(40.dp))
+                }
             }
         }
     }
 }
 
+// ===== SECTION HEADER =====
 @Composable
-fun ContinueWatchingCard(
+private fun SectionHeader(title: String, icon: String = "", count: Int = 0) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (icon.isNotEmpty()) {
+            Text(text = icon, fontSize = 16.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+        }
+        Text(
+            text = title,
+            color = Color.White,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
+        if (count > 0) {
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "$count",
+                color = Color(0xFF666666),
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+// ===== POSTER CARD (Cloudstream-style vertical poster) =====
+@Composable
+private fun PosterCard(
+    item: Any,
+    onClick: () -> Unit
+) {
+    val isShow = item is ShowItem
+    val title = if (isShow) (item as ShowItem).title else (item as MediaItem).title
+    val thumbUrl = if (isShow) (item as ShowItem).thumbnailLink else (item as MediaItem).thumbnailLink
+    val badge = if (!isShow) (item as MediaItem).resolution else null
+    val episodeCount = if (isShow) {
+        val count = (item as ShowItem).totalEpisodesCount
+        if (count > 0) "$count eps" else null
+    } else null
+
+    // Watch progress for non-show items
+    val progressPercent = if (!isShow) {
+        val savedPos = HuTubeApplication.instance.watchHistoryManager.getProgress((item as MediaItem).id)
+        val durationMs = item.durationMillis ?: 0L
+        if (durationMs > 0 && savedPos > 0) (savedPos.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+    } else 0f
+
+    var isFocused by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .width(120.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) Color.White else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable { onClick() }
+    ) {
+        // Poster image
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF1a1a1a))
+        ) {
+            if (!thumbUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = thumbUrl,
+                    contentDescription = title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        if (isShow) Icons.Default.Tv else Icons.Default.Movie,
+                        contentDescription = null,
+                        tint = Color(0xFF444444),
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+
+            // Bottom gradient
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))
+                    )
+            )
+
+            // Quality badge
+            if (badge != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .background(BrandRed, RoundedCornerShape(3.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                ) {
+                    Text(text = badge, color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Episode count badge
+            if (episodeCount != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(3.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                ) {
+                    Text(text = episodeCount, color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+
+            // Watch progress bar
+            if (progressPercent > 0f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(Color(0xFF333333))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progressPercent)
+                            .background(BrandRed)
+                    )
+                }
+            }
+        }
+
+        // Title below poster
+        Text(
+            text = title,
+            color = Color(0xFFCCCCCC),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)
+        )
+    }
+}
+
+// ===== CONTINUE WATCHING CARD =====
+@Composable
+private fun ContinueWatchingCard(
     item: WatchProgress,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     Column(
-        modifier = modifier
-            .width(160.dp)
+        modifier = Modifier
+            .width(180.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(CardBackground)
+            .background(Color(0xFF1a1a1a))
             .border(
-                width = if (isFocused) 3.dp else 0.dp,
+                width = if (isFocused) 2.dp else 0.dp,
                 color = if (isFocused) Color.White else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
@@ -288,30 +567,40 @@ fun ContinueWatchingCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize().background(Color(0xFF222222)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Gray)
-                }
             }
 
-            // Circular Progress Overlay
+            // Play icon overlay
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f)),
+                    .background(Color.Black.copy(alpha = 0.35f)),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(
-                    progress = { item.progressPercent },
-                    color = com.hutube.app.ui.theme.BrandRed,
-                    trackColor = Color.White.copy(alpha = 0.2f),
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(48.dp)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.6f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                }
+            }
+
+            // Progress bar at bottom
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(Color(0xFF333333))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(item.progressPercent)
+                        .background(BrandRed)
                 )
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
             }
         }
 
@@ -325,10 +614,9 @@ fun ContinueWatchingCard(
                 overflow = TextOverflow.Ellipsis
             )
             item.seriesTitle?.let {
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "$it · Ep ${item.episode ?: 1}",
-                    color = Color.Gray,
+                    color = Color(0xFF888888),
                     fontSize = 10.sp,
                     maxLines = 1
                 )

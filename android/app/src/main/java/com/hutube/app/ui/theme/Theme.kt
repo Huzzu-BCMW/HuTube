@@ -1,7 +1,6 @@
 package com.hutube.app.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -15,10 +14,13 @@ private val DarkColorScheme = darkColorScheme(
     secondary = BrandDarkRed,
     background = DarkBackground,
     surface = DarkSurface,
+    surfaceVariant = SurfaceGray,
     onPrimary = TextPrimary,
     onSecondary = TextPrimary,
     onBackground = TextPrimary,
-    onSurface = TextPrimary
+    onSurface = TextPrimary,
+    onSurfaceVariant = TextSecondary,
+    outline = DividerColor
 )
 
 @Composable
@@ -30,8 +32,8 @@ fun HuTubeTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
-            window.navigationBarColor = colorScheme.background.toArgb()
+            window.statusBarColor = DarkBackground.toArgb()
+            window.navigationBarColor = DarkBackground.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         }
     }
